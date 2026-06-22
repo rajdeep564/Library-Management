@@ -14,6 +14,7 @@ const fineRoutes = require("./routes/fines.js")
 const configRoutes = require("./routes/config.js")
 const { startFineCron } = require("./utils/fineCron.js")
 const { startNotificationCron } = require("./utils/notificationCron.js")
+const { ensureIndexes } = require("./utils/ensureIndexes.js")
 const qrRoutes = require("./routes/qr.js")
 const notificationRoutes = require("./routes/notifications.js")
 
@@ -76,8 +77,9 @@ if (!uri) {
 
 mongoose
   .connect(uri)
-  .then(() => {
+  .then(async () => {
     console.log("DB Connected");
+    await ensureIndexes();
     startFineCron();
     startNotificationCron();
     app.listen(PORT, () => {

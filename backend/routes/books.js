@@ -14,6 +14,8 @@ router.post("/add",userAuth,checkRole(["admin", "librarian"]),upload.single("cov
 router.get("/issued",userAuth,checkRole("user"),booksController.getIssuedBooks)
 
 router.get("/",booksController.getAllBooks)
+router.get("/categories", booksController.getBookCategories)
+router.get("/category-stats", booksController.getCategoryStats)
 router.get("/issuedrequest", userAuth, checkRole("admin", "librarian"), booksController.getIssuedRequest)
 router.get("/new",booksController.getLatestBooks)
 router.get("/import-template", userAuth, checkRole(["admin", "librarian"]), booksController.downloadImportTemplate)

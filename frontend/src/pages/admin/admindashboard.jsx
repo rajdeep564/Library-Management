@@ -20,21 +20,6 @@ import { SkeletonCard, PageLoader, ErrorBanner } from "../../components/ui";
 const COLORS = ["#1a3c6e", "#c8102e", "#276749", "#b45309", "#2b6cb0", "#6b46c1"];
 const BAR_COLORS = ["#1a3c6e", "#2b6cb0", "#276749", "#c8102e", "#6b46c1"];
 
-function countOverdue(requests) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return (requests || []).filter((r) => {
-    if (!r.dueDate) return false;
-    const due = new Date(r.dueDate);
-    due.setHours(0, 0, 0, 0);
-    return due < today;
-  }).length;
-}
-
-function sumFines(requests) {
-  return (requests || []).reduce((sum, r) => sum + (r.fine || r.fineAmount || 0), 0);
-}
-
 function formatCurrency(paisa = 0) {
   return `₹${(Number(paisa || 0) / 100).toFixed(2)}`;
 }
@@ -59,48 +44,31 @@ export default function AdminDashboard() {
     setLoading(true);
     setError(null);
     try {
-        const [homeRes, usersRes, issuedRes, pendingRes, returnRes] = await Promise.all([
-          axios.get(`${Server_URL}home/`, { headers }),
-          axios.get(`${Server_URL}users`, { headers }).catch(() => ({ data: { user: [] } })),
-          axios.get(`${Server_URL}librarian/bookissued`, { headers }).catch(() => ({ data: { requests: [] } })),
-          axios.get(`${Server_URL}librarian/issuerequest`, { headers }).catch(() => ({ data: { requests: [] } })),
-          axios.get(`${Server_URL}librarian/returnrequest`, { headers }).catch(() => ({ data: { requests: [] } })),
-        ]);
+        const { data } = await axios.get(`${Server_URL}admin/dashboard`, { headers });
+        if (data.error) throw new Error(data.message || "Failed to load dashboard");
 
-        const home = homeRes.data;
-        const users = asArray(usersRes.data.user);
-        const issued = asArray(issuedRes.data.requests);
-        const pending = asArray(pendingRes.data.requests);
-        const returns = asArray(returnRes.data.requests);
-
-        const totalBooks = home.stats?.totalBooks ?? 0;
-        const totalMembers = users.filter((u) => u.role === "user").length;
-        const issuedBooks = issued.length;
-        const pendingRequests = pending.length;
-        const overdueBooks = countOverdue(issued);
-        const fineCollected = sumFines(returns);
-
+        const { stats, categories } = data;
         setStats({
-          totalBooks,
-          issuedBooks,
-          totalMembers,
-          overdueBooks,
-          fineCollected,
-          pendingRequests,
+          totalBooks: stats?.totalBooks ?? 0,
+          issuedBooks: stats?.issuedBooks ?? 0,
+          totalMembers: stats?.totalMembers ?? 0,
+          overdueBooks: stats?.overdueBooks ?? 0,
+          fineCollected: stats?.fineCollected ?? 0,
+          pendingRequests: stats?.pendingRequests ?? 0,
         });
 
-        const cats = asArray(home.categories).map((c) => ({
-          name: c.category || c._id || "Unknown",
-          value: c.count || c.value || 0,
+        const cats = asArray(categories).map((c) => ({
+          name: c.category || "Unknown",
+          value: c.count || 0,
         }));
         setCategoryData(cats);
 
         setBarData([
-          { name: "Total", value: totalBooks },
-          { name: "Issued", value: issuedBooks },
-          { name: "Members", value: totalMembers },
-          { name: "Overdue", value: overdueBooks },
-          { name: "Pending", value: pendingRequests },
+          { name: "Total", value: stats?.totalBooks ?? 0 },
+          { name: "Issued", value: stats?.issuedBooks ?? 0 },
+          { name: "Members", value: stats?.totalMembers ?? 0 },
+          { name: "Overdue", value: stats?.overdueBooks ?? 0 },
+          { name: "Pending", value: stats?.pendingRequests ?? 0 },
         ]);
     } catch (e) {
       setError(e.response?.data?.message || e.message || "Failed to load dashboard");

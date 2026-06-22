@@ -30,16 +30,17 @@ homeController.getHomeData = async (req, res) => {
       }))
     );
 
-    const totalCategories = await BookModel.distinct("category").then(c => c.length);
+    const totalCategories = await BookModel.distinct("category").then((c) => c.length);
 
     const newArrivals = await BookModel.find()
       .sort({ createdAt: -1 })
       .limit(4)
-      .select("title author category coverImage");
+      .select("title author category coverImage")
+      .lean();
 
-    const issuedBooks = await BorrowModel.find({ status: "Issued" }).select("userId");
-    const activeStudents = new Set(issuedBooks.map(issue => issue.userId.toString()));
-    const totalActiveStudents = activeStudents.size;
+    const totalActiveStudents = await BorrowModel.distinct("userId", { status: "Issued" }).then(
+      (ids) => ids.length
+    );
 
     const responseData = {
       stats: {

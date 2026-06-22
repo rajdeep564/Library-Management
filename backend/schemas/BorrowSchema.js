@@ -27,6 +27,12 @@ const BorrowSchema = new Schema({
 
 },{ timestamps: true })
 
+BorrowSchema.index({ status: 1 });
+BorrowSchema.index({ status: 1, dueDate: 1 });
+BorrowSchema.index({ userId: 1, status: 1 });
+BorrowSchema.index({ bookId: 1, status: 1 });
+BorrowSchema.index({ createdAt: -1 });
+
 module.exports = {BorrowSchema};
 
 

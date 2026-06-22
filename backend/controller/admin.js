@@ -1,7 +1,12 @@
 const  {UserModel} = require("../model/UserModel");
+const { BookModel } = require("../model/BookModel");
+const { BorrowModel } = require("../model/BorrowModel");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { logAction } = require("../utils/auditLogger");
+const { getCache, setCache } = require("../utils/cache");
+const calculateFine = require("../utils/fineCalculator");
+const { getFineSettings } = require("../utils/systemConfig");
 const adminController = {};
 
 adminController.addLibrarian = async (req, res) => {
@@ -88,6 +93,67 @@ adminController.login = async (req,res)=>{
         res.status(500).json({ message: "Server error", error: error.message });
     }
 }
+
+adminController.getDashboard = async (req, res) => {
+  try {
+    const cached = getCache("adminDashboard");
+    if (cached) {
+      return res.json({ error: false, message: "Dashboard from cache", ...cached });
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const config = await getFineSettings();
+
+    const [
+      totalBooks,
+      totalMembers,
+      issuedBooks,
+      pendingRequests,
+      overdueBooks,
+      returnRequests,
+      categories,
+    ] = await Promise.all([
+      BookModel.countDocuments(),
+      UserModel.countDocuments({ role: "user" }),
+      BorrowModel.countDocuments({ status: "Issued" }),
+      BorrowModel.countDocuments({ status: "Requested" }),
+      BorrowModel.countDocuments({ status: "Issued", dueDate: { $lt: today } }),
+      BorrowModel.find({ status: "Requested Return" }).select("dueDate returnDate").lean(),
+      BookModel.aggregate([
+        { $group: { _id: "$category", count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 12 },
+      ]),
+    ]);
+
+    const fineCollected = returnRequests.reduce((sum, loan) => {
+      const { cappedFine } = calculateFine(loan.dueDate, loan.returnDate, config);
+      return sum + cappedFine;
+    }, 0);
+
+    const payload = {
+      stats: {
+        totalBooks,
+        issuedBooks,
+        totalMembers,
+        overdueBooks,
+        fineCollected,
+        pendingRequests,
+      },
+      categories: categories.map((c) => ({
+        category: c._id || "Unknown",
+        count: c.count,
+      })),
+    };
+
+    setCache("adminDashboard", payload);
+    res.json({ error: false, message: "Dashboard loaded", ...payload });
+  } catch (error) {
+    console.error("Dashboard error:", error);
+    res.status(500).json({ error: true, message: error.message });
+  }
+};
 
 
 module.exports = {adminController};

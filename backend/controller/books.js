@@ -84,21 +84,51 @@ booksController.addNewBook = async (req, res) => {
 
 booksController.getAllBooks = async (req, res) => {
   try {
-    const books = await BookModel.find().populate("addedBy", "name email role");
-    const totalBooks = books.length;
-    if (!books || books.length === 0) {
-      return res.status(200).json({
-        error: false,
-        message: "No books in catalog",
-        books: [],
-        totalBooks: 0,
-      });
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 24));
+    const search = (req.query.search || "").trim();
+    const category = (req.query.category || "").trim();
+
+    const filter = {};
+    if (category && category !== "All") filter.category = category;
+    if (search) {
+      filter.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { author: { $regex: search, $options: "i" } },
+        { isbn: { $regex: search, $options: "i" } },
+        { accessionNo: { $regex: search, $options: "i" } },
+      ];
     }
 
-    res.status(200).json({error:false,message:"Books fetched Successfully",books,totalBooks});
+    const skip = (page - 1) * limit;
+    const listProjection =
+      "title author category isbn price availableCopies totalCopies coverImage accessionNo createdAt description";
+
+    const [books, totalBooks] = await Promise.all([
+      BookModel.find(filter)
+        .select(listProjection)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      BookModel.countDocuments(filter),
+    ]);
+
+    res.status(200).json({
+      error: false,
+      message: "Books fetched successfully",
+      books,
+      totalBooks,
+      page,
+      limit,
+      totalPages: Math.ceil(totalBooks / limit) || 1,
+    });
   } catch (error) {
-    res.status(500).json({error:true,  message: "Internal Server Error",
-      details: error.message, });
+    res.status(500).json({
+      error: true,
+      message: "Internal Server Error",
+      details: error.message,
+    });
   }
 };
 
@@ -116,6 +146,35 @@ booksController.getIssuedRequest = async (req, res) => {
   } catch (error) {
     res.status(500).json({error:true,  message: "Internal Server Error",
       details: error.message, });
+  }
+};
+
+booksController.getBookCategories = async (req, res) => {
+  try {
+    const categories = await BookModel.distinct("category");
+    categories.sort((a, b) => a.localeCompare(b));
+    res.status(200).json({ error: false, categories: ["All", ...categories] });
+  } catch (error) {
+    res.status(500).json({ error: true, message: error.message });
+  }
+};
+
+booksController.getCategoryStats = async (req, res) => {
+  try {
+    const categories = await BookModel.aggregate([
+      { $group: { _id: "$category", count: { $sum: 1 }, coverImage: { $first: "$coverImage" } } },
+      { $sort: { count: -1 } },
+    ]);
+    res.status(200).json({
+      error: false,
+      categories: categories.map((c) => ({
+        category: c._id,
+        count: c.count,
+        coverImage: c.coverImage,
+      })),
+    });
+  } catch (error) {
+    res.status(500).json({ error: true, message: error.message });
   }
 };
 

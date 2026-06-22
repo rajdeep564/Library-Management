@@ -12,6 +12,11 @@ const ViewBooks = () => {
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalBooks, setTotalBooks] = useState(0);
+  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [deletingId, setDeletingId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [selectedBook, setSelectedBook] = useState(null);
@@ -27,17 +32,28 @@ const ViewBooks = () => {
 
   useEffect(() => {
     fetchBooks();
-  }, []);
+  }, [page, search]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPage(1);
+      setSearch(searchInput.trim());
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const fetchBooks = async () => {
     setLoading(true);
     setError(null);
     try {
-      const url = Server_URL + "books";
-      const response = await axios.get(url, {
+      const params = new URLSearchParams({ page: String(page), limit: "24" });
+      if (search) params.set("search", search);
+      const response = await axios.get(`${Server_URL}books?${params}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
       });
       setBooks(asArray(response.data.books));
+      setTotalBooks(response.data.totalBooks || 0);
+      setTotalPages(response.data.totalPages || 1);
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Failed to load books");
     } finally {
@@ -107,13 +123,22 @@ const ViewBooks = () => {
               Manage Library Books
             </h4>
             <p style={{ color: "var(--gov-text-light)", fontSize: 13, margin: "4px 0 0" }}>
-              View, edit, and remove books from the catalog
+              {totalBooks.toLocaleString()} books in catalog — showing page {page} of {totalPages}
             </p>
           </div>
-          <Link to="/admin/books/bulk-import" className="btn-gov-primary">
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <input
+              className="gov-input"
+              placeholder="Search title, author, ISBN..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              style={{ minWidth: 220 }}
+            />
+            <Link to="/admin/books/bulk-import" className="btn-gov-primary">
             <i className="bi bi-upload me-1"></i>
             Bulk Import
           </Link>
+          </div>
         </div>
       </div>
       <ErrorBanner message={error} onRetry={fetchBooks} />
@@ -168,6 +193,17 @@ const ViewBooks = () => {
       </div>
     )}
   </div>
+      {!loading && totalPages > 1 && (
+        <div className="d-flex justify-content-center align-items-center gap-2 mt-3 pb-2">
+          <button type="button" className="btn-gov-outline btn-sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+            Previous
+          </button>
+          <span style={{ fontSize: 13, color: "var(--gov-text-secondary)" }}>Page {page} / {totalPages}</span>
+          <button type="button" className="btn-gov-outline btn-sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+            Next
+          </button>
+        </div>
+      )}
       </div>
 
       {showModal && selectedBook && (

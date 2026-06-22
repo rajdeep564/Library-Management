@@ -62,25 +62,38 @@ export default function QRManager() {
   const videoRef = useRef(null);
   const scannerRef = useRef(null);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const fetchMembers = useCallback(async () => {
     try {
-      const [bookRes, memberRes] = await Promise.all([
-        axios.get(`${Server_URL}books`),
-        axios.get(`${Server_URL}qr/members`, { headers }),
-      ]);
-      setBooks(asArray(bookRes.data.books));
+      const memberRes = await axios.get(`${Server_URL}qr/members`, { headers });
       setMembers(asArray(memberRes.data.members));
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to load QR data");
+      toast.error(err.response?.data?.message || "Failed to load members");
+    }
+  }, [headers]);
+
+  const fetchBooks = useCallback(async (search = "") => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ page: "1", limit: "50" });
+      if (search.trim()) params.set("search", search.trim());
+      const bookRes = await axios.get(`${Server_URL}books?${params}`, { headers });
+      setBooks(asArray(bookRes.data.books));
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to load books");
     } finally {
       setLoading(false);
     }
   }, [headers]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchMembers();
+  }, [fetchMembers]);
+
+  useEffect(() => {
+    if (activeTab !== "books") return undefined;
+    const timer = setTimeout(() => fetchBooks(query), query ? 400 : 0);
+    return () => clearTimeout(timer);
+  }, [activeTab, query, fetchBooks]);
 
   const processScan = useCallback(async (qrData) => {
     if (!qrData) return;
@@ -120,13 +133,7 @@ export default function QRManager() {
     };
   }, [activeTab, processScan]);
 
-  const filteredBooks = asArray(books).filter((book) => {
-    const term = query.trim().toLowerCase();
-    if (!term) return true;
-    return [book.title, book.isbn, book.accessionNo, book.author]
-      .filter(Boolean)
-      .some((value) => value.toLowerCase().includes(term));
-  });
+  const filteredBooks = asArray(books);
 
   const filteredMembers = asArray(members).filter((member) => {
     const term = query.trim().toLowerCase();
@@ -184,7 +191,7 @@ export default function QRManager() {
       );
       toast.success("Book issued via QR");
       setSelectedBook(null);
-      fetchData();
+      fetchBooks(query);
     } catch (err) {
       toast.error(err.response?.data?.message || "Quick issue failed");
     }
@@ -198,7 +205,7 @@ export default function QRManager() {
       await axios.post(`${Server_URL}qr/return`, { borrowId, bookId }, { headers });
       toast.success("Book returned via QR");
       setSelectedBook(null);
-      fetchData();
+      fetchBooks(query);
     } catch (err) {
       toast.error(err.response?.data?.message || "Quick return failed");
     }

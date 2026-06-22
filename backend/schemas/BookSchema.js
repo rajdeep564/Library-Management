@@ -27,6 +27,13 @@ const BookSchema = new Schema({
     price: {type:Number},
     seededData: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now }
-}) 
+})
+
+BookSchema.index({ category: 1 });
+BookSchema.index({ createdAt: -1 });
+BookSchema.index({ title: 1 });
+BookSchema.index({ author: 1 });
+BookSchema.index({ accessionNo: 1 });
+BookSchema.index({ category: 1, createdAt: -1 });
 
 module.exports = {BookSchema};

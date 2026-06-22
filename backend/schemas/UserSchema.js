@@ -35,4 +35,7 @@ const UserSchema = new Schema({
   seededData: { type: Boolean, default: false },
 }, { timestamps: true })
 
+UserSchema.index({ role: 1 });
+UserSchema.index({ role: 1, createdAt: -1 });
+
 module.exports = {UserSchema};

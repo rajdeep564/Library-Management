@@ -21,6 +21,9 @@ function getCache(key) {
 
 function clearCache(key) {
   delete cache[key];
+  if (key === "homeData") {
+    delete cache.adminDashboard;
+  }
 }
 
 module.exports = { setCache, getCache,clearCache };

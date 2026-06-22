@@ -6,6 +6,7 @@ const {checkRole} = require("../middlewares/checkRole");
 
 
 router.post("/login",adminController.login)
+router.get("/dashboard", userAuth, checkRole("admin", "librarian"), adminController.getDashboard)
 router.post("/addlibrarian",userAuth,checkRole("admin"),adminController.addLibrarian)
 
 
