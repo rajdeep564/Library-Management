@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import "./books.css";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Server_URL } from "../../utils/config";
 import { showErrorToast, showSuccessToast } from "../../utils/toasthelper";
 import { asArray } from "../../utils/safeArray";
@@ -22,6 +22,8 @@ const Books = () => {
   const [error, setError] = useState(null);
 
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const categoryFromUrl = searchParams.get("category");
 
   async function issueBook(bookid) {
     try {
@@ -52,6 +54,13 @@ const Books = () => {
   }, []);
 
   useEffect(() => {
+    if (categoryFromUrl) {
+      setSelectedCategory(categoryFromUrl);
+      setPage(1);
+    }
+  }, [categoryFromUrl]);
+
+  useEffect(() => {
     const timer = setTimeout(() => {
       setPage(1);
       setSearchQuery(searchTerm.trim());
@@ -66,7 +75,7 @@ const Books = () => {
     if (searchQuery) params.set("search", searchQuery);
     if (selectedCategory !== "All") params.set("category", selectedCategory);
 
-    axios.get(`${Server_URL}books?${params}`)
+    axios.get(`${Server_URL}books?${params}`, { headers: { "Cache-Control": "no-cache" } })
       .then((response) => {
         setBooks(asArray(response.data.books));
         setTotalBooks(response.data.totalBooks || 0);

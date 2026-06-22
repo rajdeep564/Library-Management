@@ -102,7 +102,7 @@ booksController.getAllBooks = async (req, res) => {
 
     const skip = (page - 1) * limit;
     const listProjection =
-      "title author category isbn price availableCopies totalCopies coverImage accessionNo createdAt description";
+      "title author category isbn price availableCopies totalCopies coverImage accessionNo createdAt";
 
     const [books, totalBooks] = await Promise.all([
       BookModel.find(filter)
@@ -114,6 +114,7 @@ booksController.getAllBooks = async (req, res) => {
       BookModel.countDocuments(filter),
     ]);
 
+    res.set("Cache-Control", "no-store");
     res.status(200).json({
       error: false,
       message: "Books fetched successfully",
@@ -180,31 +181,32 @@ booksController.getCategoryStats = async (req, res) => {
 
 booksController.getLatestBooks = async (req, res) => {
   try {
-    const books = await BookModel.find().populate("addedBy", "name email role").sort({ createdAt: -1 }) ;
-    console.log(books);
-    const totalBooks = books.length;
-    if(!books || books.length === 0){
-      return res.json({error:true,message:"No Books Found"});
+    const limit = Math.min(20, Math.max(1, parseInt(req.query.limit, 10) || 10));
+
+    const [books, totalBooks, totalCategories, totalActiveStudents] = await Promise.all([
+      BookModel.find()
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .select("title author category coverImage createdAt")
+        .lean(),
+      BookModel.countDocuments(),
+      BookModel.distinct("category").then((categories) => categories.length),
+      BorrowModel.distinct("userId", { status: "Issued" }).then((ids) => ids.length),
+    ]);
+
+    if (!books.length) {
+      return res.json({ error: true, message: "No Books Found" });
     }
 
-    const uniqueCategories = new Set(books.map(book => book.category)); // Assuming the 'category' field in each book
-    const totalCategories = uniqueCategories.size;
-
-    const bookIds = books.map(book => book._id);
-
-    // Fetch the issues related to these books
-    const issuedBooks = await BorrowModel.find({
-      bookId: { $in: bookIds },
-      status: 'Issued',  // Only consider issued books
-    }).populate('userId'); // Populate student details from the 'Student' collection
-
-    // Get the unique active students from the issued books
-    const activeStudents = new Set(issuedBooks.map(issue => issue.userId._id.toString()));
-    const totalActiveStudents = activeStudents.size;
-
-
-
-    res.status(200).json({error:false,message:"Books fetched Successfully",books,totalBooks,totalCategories,totalActiveStudents});
+    res.set("Cache-Control", "no-store");
+    res.status(200).json({
+      error: false,
+      message: "Books fetched Successfully",
+      books,
+      totalBooks,
+      totalCategories,
+      totalActiveStudents,
+    });
   } catch (error) {
     res.status(500).json({error:true,  message: "Internal Server Error",
       details: error.message, });

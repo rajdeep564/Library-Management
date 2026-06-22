@@ -49,7 +49,10 @@ const ViewBooks = () => {
       const params = new URLSearchParams({ page: String(page), limit: "24" });
       if (search) params.set("search", search);
       const response = await axios.get(`${Server_URL}books?${params}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+          "Cache-Control": "no-cache",
+        },
       });
       setBooks(asArray(response.data.books));
       setTotalBooks(response.data.totalBooks || 0);
