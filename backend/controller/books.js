@@ -4,6 +4,16 @@ const {BorrowModel} = require("../model/BorrowModel")
 const cloudinary = require("cloudinary").v2;
 const calculateFine = require("../utils/fineCalculator")
 const { clearCache } = require("../utils/cache");
+const { logAction } = require("../utils/auditLogger");
+const { getFineSettings } = require("../utils/systemConfig");
+const { buildBookQrPayload } = require("../utils/qrPayload");
+const { ImportLogModel } = require("../model/ImportLogModel");
+const { buildImportTemplateBuffer } = require("../utils/excelTemplate");
+const {
+  parseImportFile,
+  validateImportRows,
+  attachQrCodes,
+} = require("../utils/importValidator");
 
 
 booksController.addNewBook = async (req, res) => {
@@ -50,7 +60,21 @@ booksController.addNewBook = async (req, res) => {
     });
 
     await newBook.save();
+    newBook.qrCode = buildBookQrPayload(newBook);
+    await newBook.save();
     clearCache("homeData");
+
+    await logAction({
+      action: "BOOK_ADDED",
+      performedBy: req.userInfo.id,
+      performedByName: req.userInfo.name,
+      performedByRole: req.userInfo.role,
+      targetId: newBook._id,
+      targetType: "Book",
+      details: `Book added: "${newBook.title}" by ${newBook.author}`,
+      req
+    });
+
     res.status(201).json({error:false , message: "Book added successfully", book: newBook });
   } catch (error) {
     console.log(error);
@@ -62,10 +86,14 @@ booksController.getAllBooks = async (req, res) => {
   try {
     const books = await BookModel.find().populate("addedBy", "name email role");
     const totalBooks = books.length;
-    if(!books || books.length === 0){
-      return res.json({error:true,message:"No Books Found"});
+    if (!books || books.length === 0) {
+      return res.status(200).json({
+        error: false,
+        message: "No books in catalog",
+        books: [],
+        totalBooks: 0,
+      });
     }
-
 
     res.status(200).json({error:false,message:"Books fetched Successfully",books,totalBooks});
   } catch (error) {
@@ -172,6 +200,18 @@ booksController.updateBook = async (req, res) => {
       return res.status(404).json({ message: "Book not found" });
     }
     clearCache("homeData");
+
+    await logAction({
+      action: "BOOK_UPDATED",
+      performedBy: req.userInfo.id,
+      performedByName: req.userInfo.name,
+      performedByRole: req.userInfo.role,
+      targetId: bookUpdate._id,
+      targetType: "Book",
+      details: `Book updated: "${bookUpdate.title}"`,
+      req
+    });
+
     res
       .status(200)
       .json({ message: "Book updated successfully", book: bookUpdate });
@@ -187,8 +227,21 @@ booksController.deleteBook = async (req, res) => {
     if (book.cloudinaryId) {
       await cloudinary.uploader.destroy(book.cloudinaryId);
     }
-    await BookModel.findByIdAndDelete(req.params.id);
+    const bookId = req.params.id;
+    await BookModel.findByIdAndDelete(bookId);
     clearCache("homeData");
+
+    await logAction({
+      action: "BOOK_DELETED",
+      performedBy: req.userInfo.id,
+      performedByName: req.userInfo.name,
+      performedByRole: req.userInfo.role,
+      targetId: bookId,
+      targetType: "Book",
+      details: `Book deleted: "${book.title}"`,
+      req
+    });
+
     res.status(200).json({ message: "Book Deleted Successfully" });
   } catch (error) {
     // console.log(deletedBook)
@@ -215,8 +268,9 @@ booksController.issueBook = async(req,res)=>{
     return res.status(400).json({ message: "No copies available to issue!" });
   }
 
+  const config = await getFineSettings();
   const dueDate = new Date();
-  dueDate.setDate(dueDate.getDate() + 15);
+  dueDate.setDate(dueDate.getDate() + config.loanPeriodDays);
 
   const borrow = new BorrowModel({
     bookId:bookid,
@@ -277,9 +331,10 @@ booksController.reqIssueBook = async (req, res) => {
       return res.status(400).json({ error: true, message: "You already requested or issued this book" });
     }
 
+    const config = await getFineSettings();
     const today = new Date();
     const dueDate = new Date();
-    dueDate.setDate(today.getDate() + 14);
+    dueDate.setDate(today.getDate() + config.loanPeriodDays);
 
     const newBorrow = new BorrowModel({
       bookId: bookid,
@@ -290,6 +345,17 @@ booksController.reqIssueBook = async (req, res) => {
     });
 
     await newBorrow.save();
+
+    await logAction({
+      action: "BOOK_ISSUE_REQUESTED",
+      performedBy: req.userInfo.id,
+      performedByName: req.userInfo.name,
+      performedByRole: req.userInfo.role,
+      targetId: book._id,
+      targetType: "Book",
+      details: `Issue requested for book: "${book.title}"`,
+      req
+    });
 
     res.status(200).json({
       error: false,
@@ -345,9 +411,10 @@ booksController.getIssuedBooks = async (req, res) => {
       });
     }
 
+    const config = await getFineSettings();
     const booksWithFine = issuedBooks.map(book => {
-      const fine = calculateFine(book.dueDate, book.returnDate); // returnDate may be null
-      return { ...book.toObject(), fine };
+      const fineResult = calculateFine(book.dueDate, book.returnDate, config);
+      return { ...book.toObject(), fine: fineResult.cappedFine, daysOverdue: fineResult.daysOverdue };
     });
 
     res.json({
@@ -378,9 +445,16 @@ booksController.returnBook = async (req, res) => {
       return res.status(400).json({ message: "Book already returned" });
   }
 
+  const config = await getFineSettings();
+  const returnDate = new Date();
+  const fineResult = calculateFine(issuedBook.dueDate, returnDate, config);
+
   // Update status and set return date
   issuedBook.status = "Returned";
-  issuedBook.returnDate = new Date();
+  issuedBook.returnDate = returnDate;
+  issuedBook.fineAmount = fineResult.cappedFine;
+  issuedBook.finePerDay = config.finePerDay;
+  issuedBook.finePaid = false;
   await issuedBook.save();
 
   // Increment available copies in the Book model
@@ -423,6 +497,145 @@ booksController.requestReturnBook = async (req, res) => {
   } catch (error) {
     console.error("Error in return request:", error);
     return res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+booksController.downloadImportTemplate = async (req, res) => {
+  try {
+    const buffer = buildImportTemplateBuffer();
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader("Content-Disposition", 'attachment; filename="book-import-template.xlsx"');
+    res.send(buffer);
+  } catch (error) {
+    res.status(500).json({ error: true, message: "Failed to generate import template" });
+  }
+};
+
+booksController.previewBulkImport = async (req, res) => {
+  try {
+    const rows = await parseImportFile(req.file);
+    const validation = await validateImportRows(rows);
+
+    await ImportLogModel.create({
+      fileName: req.file?.originalname || "",
+      status: validation.valid ? "PREVIEWED" : "FAILED",
+      attemptedRows: validation.totalRows,
+      insertedRows: 0,
+      errorCount: validation.errors.length,
+      uploadedBy: req.userInfo.id,
+      summary: validation.valid
+        ? `Preview successful for ${validation.totalRows} rows`
+        : `Preview failed with ${validation.errors.length} validation errors`,
+      errorDetails: validation.errors.slice(0, 100),
+    });
+
+    res.json({
+      error: false,
+      valid: validation.valid,
+      totalRows: validation.totalRows,
+      errorCount: validation.errors.length,
+      errors: validation.errors,
+      previewRows: validation.previewRows,
+    });
+  } catch (error) {
+    res.status(400).json({ error: true, message: error.message || "Failed to preview import" });
+  }
+};
+
+booksController.bulkImportBooks = async (req, res) => {
+  try {
+    const rows = await parseImportFile(req.file);
+    const validation = await validateImportRows(rows);
+
+    if (!validation.valid) {
+      await ImportLogModel.create({
+        fileName: req.file?.originalname || "",
+        status: "FAILED",
+        attemptedRows: validation.totalRows,
+        insertedRows: 0,
+        errorCount: validation.errors.length,
+        uploadedBy: req.userInfo.id,
+        summary: `Import blocked with ${validation.errors.length} validation errors`,
+        errorDetails: validation.errors.slice(0, 100),
+      });
+      return res.status(400).json({
+        error: true,
+        message: "Import has validation errors",
+        totalRows: validation.totalRows,
+        errorCount: validation.errors.length,
+        errors: validation.errors,
+      });
+    }
+
+    const preparedBooks = validation.rows.map(({ book }) => ({
+      ...book,
+      addedBy: req.userInfo.id,
+    }));
+    const insertedBooks = await BookModel.insertMany(preparedBooks, { ordered: true });
+    const booksWithQr = attachQrCodes(insertedBooks.map((book) => book.toObject()));
+
+    await Promise.all(
+      booksWithQr.map((book) =>
+        BookModel.findByIdAndUpdate(book._id, { qrCode: book.qrCode })
+      )
+    );
+
+    const importLog = await ImportLogModel.create({
+      fileName: req.file?.originalname || "",
+      status: "SUCCESS",
+      attemptedRows: validation.totalRows,
+      insertedRows: insertedBooks.length,
+      errorCount: 0,
+      uploadedBy: req.userInfo.id,
+      summary: `Imported ${insertedBooks.length} books successfully`,
+      errorDetails: [],
+    });
+
+    clearCache("homeData");
+    await logAction({
+      action: "BULK_IMPORT",
+      performedBy: req.userInfo.id,
+      performedByName: req.userInfo.name,
+      performedByRole: req.userInfo.role,
+      targetId: importLog._id,
+      targetType: "ImportLog",
+      details: `Bulk imported ${insertedBooks.length} books from ${req.file?.originalname || "uploaded file"}`,
+      req,
+    });
+
+    res.status(201).json({
+      error: false,
+      message: "Books imported successfully",
+      insertedRows: insertedBooks.length,
+      importLog,
+    });
+  } catch (error) {
+    await ImportLogModel.create({
+      fileName: req.file?.originalname || "",
+      status: "FAILED",
+      attemptedRows: 0,
+      insertedRows: 0,
+      errorCount: 1,
+      uploadedBy: req.userInfo.id,
+      summary: error.message || "Import failed",
+      errorDetails: [{ row: 0, field: "file", message: error.message || "Import failed" }],
+    }).catch(() => {});
+    res.status(500).json({ error: true, message: error.message || "Failed to import books" });
+  }
+};
+
+booksController.getImportHistory = async (req, res) => {
+  try {
+    const logs = await ImportLogModel.find()
+      .populate("uploadedBy", "name email role")
+      .sort({ createdAt: -1 })
+      .limit(20);
+    res.json({ error: false, logs });
+  } catch (error) {
+    res.status(500).json({ error: true, message: "Failed to load import history" });
   }
 };
 

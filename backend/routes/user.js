@@ -4,7 +4,7 @@ const {checkRole} = require("../middlewares/checkRole");
 const {userAuth} = require("../middlewares/userAuth");
 
 const {userController} = require("../controller/user")
-router.get("/",userController.getUsers)
+router.get("/", userAuth, checkRole("admin"), userController.getUsers)
 
 router.post("/register",userController.userRegistration);
 

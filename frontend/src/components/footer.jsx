@@ -1,38 +1,34 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { 
-  FiFacebook, 
-  FiTwitter, 
-  FiInstagram, 
-  FiLinkedin, 
-  FiMail, 
-  FiPhone, 
-  FiMapPin, 
-  FiClock 
-} from 'react-icons/fi';
-import './footer.css';
+import React from "react";
+import { Link } from "react-router-dom";
+import {
+  FiFacebook,
+  FiTwitter,
+  FiInstagram,
+  FiLinkedin,
+  FiMail,
+  FiPhone,
+  FiMapPin,
+  FiClock,
+} from "react-icons/fi";
+import "./footer.css";
 
 const Footer = () => {
-  
   const handleLinkClick = () => {
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth'
-    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   return (
-    <footer className="library-footer">
+    <footer className="library-footer gov-footer">
       <div className="footer-container">
-      
         <div className="footer-main">
-   
           <div className="footer-column">
-            <h3 className="footer-heading">About Us</h3>
+            <h3 className="footer-heading">
+              <i className="bi bi-book-half me-2"></i>
+              e-GranthaAlaya
+            </h3>
             <p className="footer-about-text">
-              The College Library serves as the academic hub of our institution, 
-              providing resources and services to support learning, teaching, 
-              and research for our students and faculty.
+              Digital Library Management System for the Ahmedabad Municipal Library Network.
+              Access municipal library resources, browse collections, and manage your membership online.
             </p>
             <div className="footer-social">
               <a href="#" className="social-icon" aria-label="Facebook">
@@ -50,7 +46,6 @@ const Footer = () => {
             </div>
           </div>
 
-       
           <div className="footer-column">
             <h3 className="footer-heading">Quick Links</h3>
             <ul className="footer-links">
@@ -62,39 +57,38 @@ const Footer = () => {
             </ul>
           </div>
 
-         
-
-        
           <div className="footer-column">
             <h3 className="footer-heading">Contact Us</h3>
             <ul className="footer-contact-info">
               <li className="contact-item">
                 <FiMapPin className="contact-icon" />
-                <span>123 College Avenue, Academic City, AC 12345</span>
+                <span>Ahmedabad Municipal Corporation, Gujarat, India</span>
               </li>
               <li className="contact-item">
                 <FiMail className="contact-icon" />
-                <span>library@college.edu</span>
+                <span>library@amcn.gov.in</span>
               </li>
               <li className="contact-item">
                 <FiPhone className="contact-icon" />
-                <span>(123) 456-7890</span>
+                <span>+91 79 0000 0000</span>
               </li>
               <li className="contact-item">
                 <FiClock className="contact-icon" />
                 <div>
-                  <p>Mon-Fri: 8:00 AM - 10:00 PM</p>
-                  <p>Sat-Sun: 10:00 AM - 6:00 PM</p>
+                  <p>Mon–Sat: 9:00 AM – 8:00 PM</p>
+                  <p>Sunday: 10:00 AM – 5:00 PM</p>
                 </div>
               </li>
             </ul>
           </div>
         </div>
 
-        
         <div className="footer-bottom">
           <div className="footer-copyright">
-            &copy; {new Date().getFullYear()} College Library. All rights reserved.
+            &copy; {new Date().getFullYear()} e-GranthaAlaya — Digital Library Management System. All rights reserved.
+          </div>
+          <div className="footer-developer">
+            Developed for Ahmedabad Municipal Library Network
           </div>
           <div className="footer-legal">
             <Link to="/privacy" className="legal-link" onClick={handleLinkClick}>Privacy Policy</Link>

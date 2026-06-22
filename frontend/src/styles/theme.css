@@ -1,0 +1,53 @@
+:root {
+  /* Primary Colors */
+  --gov-primary:       #1a3c6e;
+  --gov-primary-dark:  #0f2547;
+  --gov-primary-light: #2d5a9e;
+  --gov-accent:        #c8102e;
+  --gov-accent-light:  #f0e6e8;
+
+  /* Neutral Colors */
+  --gov-bg:            #f0f4f8;
+  --gov-surface:       #ffffff;
+  --gov-surface-alt:   #f8fafc;
+  --gov-border:        #d1dce8;
+  --gov-border-light:  #e8eef5;
+
+  /* Text Colors */
+  --gov-text-primary:  #1a202c;
+  --gov-text-secondary:#4a5568;
+  --gov-text-light:    #718096;
+  --gov-text-white:    #ffffff;
+
+  /* Status Colors */
+  --gov-success:       #276749;
+  --gov-success-bg:    #e6f4ed;
+  --gov-warning:       #b45309;
+  --gov-warning-bg:    #fef3c7;
+  --gov-danger:        #c53030;
+  --gov-danger-bg:     #fff5f5;
+  --gov-info:          #2b6cb0;
+  --gov-info-bg:       #ebf8ff;
+
+  /* Typography */
+  --gov-font:          'Segoe UI', Arial, sans-serif;
+  --gov-font-size-xs:  11px;
+  --gov-font-size-sm:  13px;
+  --gov-font-size-base:15px;
+  --gov-font-size-lg:  17px;
+  --gov-font-size-xl:  20px;
+  --gov-font-size-2xl: 24px;
+
+  /* Spacing */
+  --gov-radius-sm:     4px;
+  --gov-radius:        8px;
+  --gov-radius-lg:     12px;
+  --gov-shadow-sm:     0 1px 3px rgba(0,0,0,0.08);
+  --gov-shadow-md:     0 2px 6px rgba(0,0,0,0.12);
+  --gov-shadow:        0 2px 8px rgba(0,0,0,0.10);
+  --gov-shadow-lg:     0 4px 16px rgba(0,0,0,0.12);
+
+  /* Sidebar */
+  --gov-sidebar-width: 260px;
+  --gov-header-height: 64px;
+}

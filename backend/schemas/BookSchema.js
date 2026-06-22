@@ -11,7 +11,21 @@ const BookSchema = new Schema({
     addedBy: { type: Schema.Types.ObjectId, ref: 'User',required: true },
     coverImage: { type: String },
     cloudinaryId: { type: String, required: true },
+    qrCode: { type: String, default: "" },
+    accessionNo: { type: String, default: "" },
+    publisher: { type: String, default: "" },
+    publishYear: { type: Number },
+    edition: { type: String, default: "" },
+    language: { type: String, default: "English" },
+    subCategory: { type: String, default: "" },
+    location: { type: String, default: "" },
+    shelfNo: { type: String, default: "" },
+    sourceOfAcquisition: { type: String, default: "" },
+    pricePerCopy: { type: Number },
+    dateOfAddition: { type: Date },
+    keywords: [{ type: String }],
     price: {type:Number},
+    seededData: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now }
 }) 
 

@@ -26,3 +26,13 @@ export const showErrorToast = (message) => {
     theme: "light",
   });
 };
+
+export const showLoadingToast = (message) =>
+  toast.loading(message || "Please wait...", {
+    position: "top-right",
+  });
+
+export const dismissToast = (id) => {
+  if (id) toast.dismiss(id);
+  else toast.dismiss();
+};

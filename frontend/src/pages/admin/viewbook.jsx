@@ -1,13 +1,19 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { Link } from "react-router-dom";
 import { Server_URL } from "../../utils/config";
 import { showErrorToast, showSuccessToast } from "../../utils/toasthelper";
+import { asArray } from "../../utils/safeArray";
+import { SkeletonBookGrid, EmptyState, ErrorBanner, ButtonSpinner } from "../../components/ui";
 
 import "./viewbook.css"
 
 const ViewBooks = () => {
   const [books, setBooks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+  const [saving, setSaving] = useState(false);
   const [selectedBook, setSelectedBook] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({
@@ -24,29 +30,34 @@ const ViewBooks = () => {
   }, []);
 
   const fetchBooks = async () => {
+    setLoading(true);
+    setError(null);
     try {
       const url = Server_URL + "books";
       const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
       });
-      setBooks(response.data.books);
-    } catch (error) {
-      console.error("Error fetching books:", error.response?.data?.message || error.message);
+      setBooks(asArray(response.data.books));
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Failed to load books");
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this book?")) return;
-
+    setDeletingId(id);
     try {
       await axios.delete(`${Server_URL}books/delete/${id}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
       });
       showSuccessToast("Book deleted successfully!");
       fetchBooks();
-    } catch (error) {
-      console.error("Error deleting book:", error.response?.data?.message || error.message);
-      showErrorToast("Failed to delete book!");
+    } catch (err) {
+      showErrorToast(err.response?.data?.message || "Failed to delete book!");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -70,29 +81,49 @@ const ViewBooks = () => {
   
  
   const handleUpdate = async () => {
+    setSaving(true);
     try {
-      
       await axios.put(`${Server_URL}books/update/${selectedBook._id}`, formData, {
         headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
       });
-  
       showSuccessToast("Book updated successfully!");
       setShowModal(false);
       fetchBooks();
-    } catch (error) {
-      console.error("Error updating book:", error.response?.data?.message || error.message);
-      showErrorToast("Failed to update book!");
+    } catch (err) {
+      showErrorToast(err.response?.data?.message || "Failed to update book!");
+    } finally {
+      setSaving(false);
     }
   };
   
 
   return (
-    <div className="container mt-4">
-      <h2 className="admin-book-heading">📖 Manage Library Books</h2>
-      <div className="container">
+    <div>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+          <div>
+            <h4 style={{ fontSize: 18, fontWeight: 700, color: "var(--gov-text-primary)", margin: 0 }}>
+              <i className="bi bi-book" style={{ marginRight: 8, color: "var(--gov-primary)" }}></i>
+              Manage Library Books
+            </h4>
+            <p style={{ color: "var(--gov-text-light)", fontSize: 13, margin: "4px 0 0" }}>
+              View, edit, and remove books from the catalog
+            </p>
+          </div>
+          <Link to="/admin/books/bulk-import" className="btn-gov-primary">
+            <i className="bi bi-upload me-1"></i>
+            Bulk Import
+          </Link>
+        </div>
+      </div>
+      <ErrorBanner message={error} onRetry={fetchBooks} />
+      <div className="gov-card">
+      <div className="container-fluid px-0">
   <div className="row">
-    {books.length > 0 ? (
-      books.map((book, index) => (
+    {loading ? (
+      <div className="col-12"><SkeletonBookGrid count={8} /></div>
+    ) : asArray(books).length > 0 ? (
+      asArray(books).map((book) => (
         <div key={book._id} className="col-lg-3 col-md-4 col-sm-6 mb-4">
           <div className="card book-card">
             <div className="book-image-wrapper">
@@ -105,83 +136,90 @@ const ViewBooks = () => {
             <div className="card-body">
               <h5 className="card-title">{book.title}</h5>
               <p className="book-author">{book.author}</p>
-              <p className="book-category">📚 {book.category}</p>
-              <p className="book-isbn">🔢 ISBN: {book.isbn}</p>
-              <p className="book-price">💰 ₹{book.price}</p>
+              <p className="book-category"><i className="bi bi-book me-1"></i>{book.category}</p>
+              <p className="book-isbn"><i className="bi bi-upc me-1"></i>ISBN: {book.isbn}</p>
+              <p className="book-price"><i className="bi bi-currency-rupee me-1"></i>{book.price}</p>
             </div>
             <div className="card-footer text-center">
-              <button className="btn edit-btn me-2" onClick={() => handleEdit(book)}>
-                ✏ Edit
-              </button>
-              <button className="btn delete-btn" onClick={() => handleDelete(book._id)}>
-                🗑 Delete
-              </button>
+              <ButtonSpinner variant="secondary" className="btn-sm me-2" onClick={() => handleEdit(book)} style={{ padding: "4px 10px", fontSize: 12 }}>
+                <i className="bi bi-pencil me-1"></i>Edit
+              </ButtonSpinner>
+              <ButtonSpinner
+                variant="danger"
+                className="btn-sm"
+                loading={deletingId === book._id}
+                onClick={() => handleDelete(book._id)}
+                style={{ padding: "4px 10px", fontSize: 12 }}
+              >
+                <i className="bi bi-trash me-1"></i>Delete
+              </ButtonSpinner>
             </div>
           </div>
         </div>
       ))
     ) : (
-      <div className="text-center py-4">
-        <h5 className="text-muted">No books found.</h5>
+      <div className="col-12">
+        <EmptyState
+          iconClass="bi-book"
+          title="No books found"
+          message="Add books manually or use bulk import"
+          action={{ label: "Add Book", onClick: () => window.location.hash = "#/admin/addbook" }}
+        />
       </div>
     )}
   </div>
-</div>
-
-
-
-
-
-   
-      {showModal && selectedBook && (
-  <div className="modal d-block" tabIndex="-1">
-    <div className="modal-dialog modal-dialog-centered modal-lg"> {/* Centered and Larger Modal */}
-      <div className="modal-content shadow-lg rounded-3"> {/* Added Shadow & Rounded Corners */}
-        <div className="modal-header bg-primary text-white">
-          <h5 className="modal-title">Edit Book</h5>
-          <button type="button" className="btn-close" onClick={() => setShowModal(false)}></button>
-        </div>
-        <div className="modal-body p-4">
-          <form>
-            <div className="mb-3">
-              <label className="form-label fw-bold">Title</label>
-              <input type="text" className="form-control" name="title" value={formData.title} onChange={handleChange} />
-            </div>
-            <div className="mb-3">
-              <label className="form-label fw-bold">Author</label>
-              <input type="text" className="form-control" name="author" value={formData.author} onChange={handleChange} />
-            </div>
-            <div className="mb-3">
-              <label className="form-label fw-bold">Category</label>
-              <input type="text" className="form-control" name="category" value={formData.category} onChange={handleChange} />
-            </div>
-            <div className="row">
-              <div className="col-md-6 mb-3">
-                <label className="form-label fw-bold">ISBN</label>
-                <input type="text" className="form-control" name="isbn" value={formData.isbn} onChange={handleChange} />
-              </div>
-              <div className="col-md-6 mb-3">
-                <label className="form-label fw-bold">Price (₹)</label>
-                <input type="number" className="form-control" name="price" value={formData.price} onChange={handleChange} />
-              </div>
-            </div>
-            <div className="mb-3">
-              <label className="form-label fw-bold">Total Copies</label>
-              <input type="number" className="form-control" name="totalCopies" value={formData.totalCopies} onChange={handleChange} />
-            </div>
-          </form>
-        </div>
-        <div className="modal-footer d-flex justify-content-between p-3">
-          <button type="button" className="btn btn-secondary px-4" onClick={() => setShowModal(false)}>Cancel</button>
-          <button type="button" className="btn btn-success px-4" onClick={handleUpdate}>Update</button>
-        </div>
       </div>
-    </div>
-  </div>
-)}
 
-
-
+      {showModal && selectedBook && (
+        <div className="modal d-block" tabIndex="-1" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="modal-dialog modal-dialog-centered modal-lg">
+            <div className="modal-content gov-card" style={{ border: "none" }}>
+              <div
+                className="modal-header"
+                style={{ background: "var(--gov-primary)", color: "white", borderRadius: "var(--gov-radius) var(--gov-radius) 0 0" }}
+              >
+                <h5 className="modal-title">Edit Book</h5>
+                <button type="button" className="btn-close btn-close-white" onClick={() => setShowModal(false)}></button>
+              </div>
+              <div className="modal-body p-4">
+                <form>
+                  <div className="mb-3">
+                    <label className="gov-label">Title</label>
+                    <input type="text" className="gov-input" name="title" value={formData.title} onChange={handleChange} />
+                  </div>
+                  <div className="mb-3">
+                    <label className="gov-label">Author</label>
+                    <input type="text" className="gov-input" name="author" value={formData.author} onChange={handleChange} />
+                  </div>
+                  <div className="mb-3">
+                    <label className="gov-label">Category</label>
+                    <input type="text" className="gov-input" name="category" value={formData.category} onChange={handleChange} />
+                  </div>
+                  <div className="row">
+                    <div className="col-md-6 mb-3">
+                      <label className="gov-label">ISBN</label>
+                      <input type="text" className="gov-input" name="isbn" value={formData.isbn} onChange={handleChange} />
+                    </div>
+                    <div className="col-md-6 mb-3">
+                      <label className="gov-label">Price (₹)</label>
+                      <input type="number" className="gov-input" name="price" value={formData.price} onChange={handleChange} />
+                    </div>
+                  </div>
+                  <div className="mb-3">
+                    <label className="gov-label">Total Copies</label>
+                    <input type="number" className="gov-input" name="totalCopies" value={formData.totalCopies} onChange={handleChange} />
+                  </div>
+                </form>
+              </div>
+              <div className="modal-footer d-flex justify-content-between p-3">
+                <button type="button" className="btn-gov-outline" onClick={() => setShowModal(false)}>Cancel</button>
+                <ButtonSpinner loading={saving} onClick={handleUpdate}>Update</ButtonSpinner>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      </div>
     </div>
   );
 };

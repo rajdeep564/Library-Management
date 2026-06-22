@@ -1,6 +1,4 @@
 const jwt = require("jsonwebtoken");
-const JWT_SECRET = "12345@abcd12";
-
 
 const userAuth = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -12,7 +10,7 @@ const userAuth = (req, res, next) => {
   const token = authHeader.split(" ")[1]; 
 
   try {
-    const decoded = jwt.verify(token,JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.userInfo = decoded; 
     next(); 
   } catch (error) {

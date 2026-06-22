@@ -2,14 +2,15 @@ const  {UserModel} = require("../model/UserModel");
 const  {ContactModel} = require("../model/ContactModel");
 const nodemailer = require("nodemailer");
 const bcrypt = require("bcryptjs");
-const JWT_SECRET = "12345@abcd12";
 const jwt = require("jsonwebtoken");
 const {OtpModel} = require("../model/OtpModel");
+const { logAction } = require("../utils/auditLogger");
+const { sendWelcomeMember } = require("../utils/notificationService");
 const userController = {};
 
 userController.userRegistration = async (req, res) => {
     try {
-        const { name, email, password, stream, year,role } = req.body;
+        const { name, email, password, stream, year } = req.body;
         const existingUser = await UserModel.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ message: "Email already exists" });
@@ -23,10 +24,23 @@ userController.userRegistration = async (req, res) => {
       password: hashedPassword,
       stream,
       year,
-      role
+      role: "user"
         });
 // console.log(user);
         await user.save();
+
+        await logAction({
+          action: "USER_REGISTERED",
+          performedBy: user._id,
+          performedByName: user.name,
+          performedByRole: "user",
+          details: `New member registered: ${user.email}`,
+          req
+        });
+
+        sendWelcomeMember(user).catch((err) => {
+          console.error("Welcome notification failed:", err.message);
+        });
 
         res.status(201).json({ message: "User registered successfully" });
     } catch (error) {
@@ -59,7 +73,17 @@ userController.login = async (req,res)=>{
             name: user.name,
             role: user.role
           };
-          const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "24h" });
+          const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "24h" });
+
+          await logAction({
+            action: "USER_LOGIN",
+            performedBy: user._id,
+            performedByName: user.name,
+            performedByRole: user.role,
+            details: `Login from ${req.ip || "unknown"}`,
+            req
+          });
+
           res.json({ message: "Login successful", token, user: { name: user.name, email: user.email, role: user.role } });
         //   res.json({ message: "Login successful"});
         

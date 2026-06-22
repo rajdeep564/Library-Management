@@ -1,364 +1,282 @@
-import React, { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
-import { Pie } from "react-chartjs-2";
-import "chart.js/auto";
+import { Link } from "react-router-dom";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
 import { Server_URL } from "../../utils/config";
-import "./AdminDashboard.css";
+import { asArray } from "../../utils/safeArray";
+import { SkeletonCard, PageLoader, ErrorBanner } from "../../components/ui";
 
-const AdminDashboard = () => {
-  const [selectedSection, setSelectedSection] = useState("dashboard");
-  const [user, setUser] = useState([]);
-  const [lib, setLib] = useState([]);
-  const [books, setBooks] = useState([]);
-  const [latestBooks, setLatestBooks] = useState([]);
-  const [totalUser, setTotalUser] = useState(0);
-  const [totalLib, setTotalLib] = useState(0);
-  const [totalBooks, setTotalBooks] = useState(0);
-  const [borrowedBooks, setBorrowedBooks] = useState(0);
-  const [occupancyPercent, setOccupancyPercent] = useState(0);
-  const [issueRequest, setIssueRequest] = useState(0);
-  const [categoryData, setCategoryData] = useState({
-    labels: [],
-    datasets: [
-      {
-        data: [],
-        backgroundColor: [
-          "#3498db",
-          "#f39c12",
-          "#9b59b6",
-          "#e74c3c",
-          "#2ecc71",
-        ],
-      },
-    ],
+const COLORS = ["#1a3c6e", "#c8102e", "#276749", "#b45309", "#2b6cb0", "#6b46c1"];
+const BAR_COLORS = ["#1a3c6e", "#2b6cb0", "#276749", "#c8102e", "#6b46c1"];
+
+function countOverdue(requests) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return (requests || []).filter((r) => {
+    if (!r.dueDate) return false;
+    const due = new Date(r.dueDate);
+    due.setHours(0, 0, 0, 0);
+    return due < today;
+  }).length;
+}
+
+function sumFines(requests) {
+  return (requests || []).reduce((sum, r) => sum + (r.fine || r.fineAmount || 0), 0);
+}
+
+function formatCurrency(paisa = 0) {
+  return `₹${(Number(paisa || 0) / 100).toFixed(2)}`;
+}
+
+export default function AdminDashboard() {
+  const [stats, setStats] = useState({
+    totalBooks: 0,
+    issuedBooks: 0,
+    totalMembers: 0,
+    overdueBooks: 0,
+    fineCollected: 0,
+    pendingRequests: 0,
   });
+  const [categoryData, setCategoryData] = useState([]);
+  const [barData, setBarData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const token = localStorage.getItem("authToken");
-  const role = localStorage.getItem("role");
-
-  async function getUsers() {
+  const fetchData = async () => {
+    const token = localStorage.getItem("authToken");
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    setLoading(true);
+    setError(null);
     try {
-      const url = Server_URL + "users";
-      const result = await axios.get(url);
-      const { error, message } = result.data;
-      if (error) {
-        alert(message);
-      } else {
-        const { user, totalUser } = result.data;
-        const students = user.filter((u) => u.role === "user");
-        const librarians = user.filter((u) => u.role === "librarian");
-        setUser(students);
-        setLib(librarians);
-        setTotalUser(students.length);
-        setTotalLib(librarians.length);
-      }
-    } catch (error) {
-      console.error("Error fetching users:", error);
-    }
-  }
+        const [homeRes, usersRes, issuedRes, pendingRes, returnRes] = await Promise.all([
+          axios.get(`${Server_URL}home/`, { headers }),
+          axios.get(`${Server_URL}users`, { headers }).catch(() => ({ data: { user: [] } })),
+          axios.get(`${Server_URL}librarian/bookissued`, { headers }).catch(() => ({ data: { requests: [] } })),
+          axios.get(`${Server_URL}librarian/issuerequest`, { headers }).catch(() => ({ data: { requests: [] } })),
+          axios.get(`${Server_URL}librarian/returnrequest`, { headers }).catch(() => ({ data: { requests: [] } })),
+        ]);
 
-  async function getBooks() {
-    try {
-      const url = Server_URL + "books";
-      const result = await axios.get(url);
-      const { error, message } = result.data;
-      if (error) {
-        alert(message);
-      } else {
-        const { books, totalBooks } = result.data;
-        setBooks(books);
-        setTotalBooks(totalBooks);
+        const home = homeRes.data;
+        const users = asArray(usersRes.data.user);
+        const issued = asArray(issuedRes.data.requests);
+        const pending = asArray(pendingRes.data.requests);
+        const returns = asArray(returnRes.data.requests);
 
-        const categoryCount = books.reduce((acc, book) => {
-          acc[book.category] = (acc[book.category] || 0) + 1;
-          return acc;
-        }, {});
+        const totalBooks = home.stats?.totalBooks ?? 0;
+        const totalMembers = users.filter((u) => u.role === "user").length;
+        const issuedBooks = issued.length;
+        const pendingRequests = pending.length;
+        const overdueBooks = countOverdue(issued);
+        const fineCollected = sumFines(returns);
 
-        const labels = Object.keys(categoryCount);
-        const data = Object.values(categoryCount);
-        setCategoryData({
-          labels,
-          datasets: [
-            {
-              data,
-              backgroundColor: [
-                "#3498db",
-                "#f39c12",
-                "#9b59b6",
-                "#e74c3c",
-                "#2ecc71",
-              ],
-            },
-          ],
+        setStats({
+          totalBooks,
+          issuedBooks,
+          totalMembers,
+          overdueBooks,
+          fineCollected,
+          pendingRequests,
         });
 
-        const borrowed = books.reduce((acc, book) => {
-          return acc + (book.totalCopies - book.availableCopies);
-        }, 0);
-        setBorrowedBooks(borrowed);
+        const cats = asArray(home.categories).map((c) => ({
+          name: c.category || c._id || "Unknown",
+          value: c.count || c.value || 0,
+        }));
+        setCategoryData(cats);
 
-        const total = books.reduce((acc, book) => acc + book.totalCopies, 0);
-        const occupancy = total ? Math.round((borrowed / total) * 100) : 0;
-        setOccupancyPercent(occupancy);
-      }
-    } catch (error) {
-      console.error("Error fetching books:", error);
+        setBarData([
+          { name: "Total", value: totalBooks },
+          { name: "Issued", value: issuedBooks },
+          { name: "Members", value: totalMembers },
+          { name: "Overdue", value: overdueBooks },
+          { name: "Pending", value: pendingRequests },
+        ]);
+    } catch (e) {
+      setError(e.response?.data?.message || e.message || "Failed to load dashboard");
+    } finally {
+      setLoading(false);
     }
-  }
-
-  async function getLatestBooks() {
-    try {
-      const url = Server_URL + 'books/new';
-      const result = await axios.get(url);
-      const {error, message} = result.data;
-      if (error) {
-        alert(message);        
-      } else {
-        console.log("result");
-        console.log(result);
-        const {books, totalBooks} = result.data;
-        setLatestBooks(books);
-      }
-    } catch (error) {
-      console.error("Error fetching books:", error);            
-    }    
-  }
-
-  const handleSectionChange = (section) => {
-    setSelectedSection(section);
   };
 
   useEffect(() => {
-    getUsers();
-    getBooks();
-    getLatestBooks();
+    fetchData();
   }, []);
 
+  const statCards = [
+    { label: "Total Books", value: stats.totalBooks, icon: "bi-book-fill", color: "#1a3c6e" },
+    { label: "Books Issued", value: stats.issuedBooks, icon: "bi-arrow-right-circle-fill", color: "#2b6cb0" },
+    { label: "Total Members", value: stats.totalMembers, icon: "bi-people-fill", color: "#276749" },
+    { label: "Overdue Books", value: stats.overdueBooks, icon: "bi-exclamation-circle-fill", color: "#c8102e" },
+    { label: "Fine Collected (₹)", value: formatCurrency(stats.fineCollected), icon: "bi-cash-coin", color: "#b45309" },
+    { label: "Pending Requests", value: stats.pendingRequests, icon: "bi-hourglass-split", color: "#6b46c1" },
+  ];
+
   return (
-    <div className="admin-dashboard">
-      <div className="row g-0">
-        <nav className="col-md-3 col-lg-2 admin-sidebar">
-          {role == "admin" ? (
-            <h4 className="admin-sidebar-title">📌 Admin Panel</h4>
-          ) : (
-            <h4 className="admin-sidebar-title">📌 Librarian Panel</h4>
-          )}
-          <ul className="admin-nav">
-            <li className="admin-nav-item">
-              <button
-                className={`admin-nav-btn ${
-                  selectedSection === "dashboard" ? "active" : ""
-                }`}
-                onClick={() => handleSectionChange("dashboard")}
-              >
-                📊 Dashboard
-              </button>
-            </li>
-            <li className="admin-nav-item">
-              <button
-                className={`admin-nav-btn ${
-                  selectedSection === "users" ? "active" : ""
-                }`}
-                onClick={() => handleSectionChange("users")}
-              >
-                👥 Users
-              </button>
-            </li>
-            {role === "admin" && (
-              <li className="admin-nav-item">
-                <button
-                  className={`admin-nav-btn ${
-                    selectedSection === "librarians" ? "active" : ""
-                  }`}
-                  onClick={() => handleSectionChange("librarians")}
+    <div>
+      <ErrorBanner message={error} onRetry={fetchData} />
+      <div style={{ marginBottom: 24 }}>
+        <h4 style={{ fontSize: 20, fontWeight: 700, color: "var(--gov-text-primary)", margin: 0 }}>
+          <i className="bi bi-speedometer2" style={{ marginRight: 8, color: "var(--gov-primary)" }}></i>
+          Dashboard Overview
+        </h4>
+        <p style={{ color: "var(--gov-text-light)", fontSize: 13, margin: "4px 0 0" }}>
+          Ahmedabad Municipal Library Network — Real-time system summary
+        </p>
+      </div>
+
+      {loading ? (
+        <SkeletonCard count={6} />
+      ) : (
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+          gap: 16,
+          marginBottom: 28,
+        }}
+      >
+        {statCards.map((card, i) => (
+          <div key={i} className="stat-card" style={{ borderLeftColor: card.color }}>
+            <div className="stat-card-icon" style={{ background: card.color }}>
+              <i className={`bi ${card.icon}`}></i>
+            </div>
+            <div>
+              <div className="stat-card-value">{card.value}</div>
+              <div className="stat-card-label">{card.label}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      )}
+
+      {loading ? (
+        <PageLoader label="Loading charts..." />
+      ) : (
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 }}>
+        <div className="gov-card">
+          <div className="gov-card-header">
+            <i className="bi bi-pie-chart-fill"></i>
+            Books by Category
+          </div>
+          {categoryData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={240}>
+              <PieChart>
+                <Pie
+                  data={categoryData}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={90}
+                  dataKey="value"
+                  label={({ name, percent }) =>
+                    percent > 0 ? `${name} ${(percent * 100).toFixed(0)}%` : ""
+                  }
+                  labelLine={false}
+                  fontSize={11}
                 >
-                  📚 Librarians
-                </button>
-              </li>
-            )}
-            <li className="admin-nav-item">
-              <button
-                className={`admin-nav-btn ${
-                  selectedSection === "books" ? "active" : ""
-                }`}
-                onClick={() => handleSectionChange("books")}
-              >
-                📖 Books
-              </button>
-            </li>
-          </ul>
-        </nav>
-
-        <main className="col-md-9 col-lg-10 admin-main">
-          {selectedSection === "dashboard" && (
-            <>
-              <h2 className="admin-section-title">📊 Dashboard Overview</h2>
-
-              <div className="stats-grid">
-                <div className="stat-card books">
-                  <h3>Total Books</h3>
-                  <p>{totalBooks}</p>
-                </div>
-                <div className="stat-card users">
-                  <h3>Total Users</h3>
-                  <p>{totalUser}</p>
-                </div>
-                {role === "admin" && (
-                  <div className="stat-card librarians">
-                    <h3>Total Librarians</h3>
-                    <p>{totalLib}</p>
-                  </div>
-                )}
-                <div className="stat-card borrowed">
-                  <h3>Books Borrowed</h3>
-                  <p>{borrowedBooks}</p>
-                </div>
-              </div>
-
-              <div className="progress-grid">
-                <div className="progress-card">
-                  <h3>Books Issued</h3>
-                  <div className="progress-container">
-                    <div
-                      className="progress-bar"
-                      style={{ width: `${occupancyPercent}%` }}
-                    >
-                      {occupancyPercent}%
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="chart-activity-grid">
-                <div className="chart-card">
-                  <h3>Category Distribution</h3>
-                  <div style={{ height: "250px" }}>
-                    <Pie
-                      data={categoryData}
-                      options={{
-                        plugins: {
-                          legend: {
-                            position: "bottom",
-                            labels: {
-                              padding: 20,
-                              usePointStyle: true,
-                            },
-                          },
-                        },
-                        maintainAspectRatio: false,
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div className="activity-card">
-                  <h3>Recent Addition</h3>
-                  <div className="activity-list">
-                    {latestBooks.slice(0, 4).map((book, index) => (
-                      <div key={index} className="activity-item">
-                        <div className="activity-icon">📚</div>
-                        <div className="activity-text">
-                          <strong>{book.title}</strong> added by {book.addedBy?.name} 
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </>
+                  {categoryData.map((_, i) => (
+                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div
+              style={{
+                height: 240,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "var(--gov-text-light)",
+                fontSize: 13,
+              }}
+            >
+              No category data available
+            </div>
           )}
+        </div>
 
-          {selectedSection === "users" && (
-            <>
-              <h2 className="admin-section-title">👥 Users Management</h2>
-              <div className="admin-table-container">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>ID</th>
-                      <th>Name</th>
-                      <th>Email</th>
-                      <th>Stream</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {user.map((data, index) => (
-                      <tr key={index}>
-                        <td>{index + 1}</td>
-                        <td>{data.name}</td>
-                        <td>{data.email}</td>
-                        <td>{data.stream}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
+        <div className="gov-card">
+          <div className="gov-card-header">
+            <i className="bi bi-bar-chart-fill"></i>
+            Circulation Overview
+          </div>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={barData} barSize={36}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="name" fontSize={12} tick={{ fill: "#6b7280" }} />
+              <YAxis fontSize={12} tick={{ fill: "#6b7280" }} />
+              <Tooltip contentStyle={{ fontSize: 12 }} />
+              <Bar
+                dataKey="value"
+                radius={[4, 4, 0, 0]}
+                fill={BAR_COLORS[0]}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+      )}
 
-          {selectedSection === "librarians" && (
-            <>
-              <h2 className="admin-section-title">📚 Librarians Management</h2>
-              <div className="admin-table-container">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>ID</th>
-                      <th>Name</th>
-                      <th>Email</th>
-                      <th>Role</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lib.map((data, index) => (
-                      <tr key={index}>
-                        <td>{index + 1}</td>
-                        <td>{data.name}</td>
-                        <td>{data.email}</td>
-                        <td>{data.role}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-
-          {selectedSection === "books" && (
-            <>
-              <h2 className="admin-section-title">📖 Books Inventory</h2>
-              <div className="admin-table-container">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>ID</th>
-                      <th>Title</th>
-                      <th>Author</th>
-                      <th>Category</th>
-                      <th>Total Copies</th>
-                      <th>Available</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {books.map((data, index) => (
-                      <tr key={index}>
-                        <td>{index + 1}</td>
-                        <td>{data.title}</td>
-                        <td>{data.author}</td>
-                        <td>{data.category}</td>
-                        <td>{data.totalCopies}</td>
-                        <td>{data.availableCopies}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-        </main>
+      <div className="gov-card">
+        <div className="gov-card-header">
+          <i className="bi bi-lightning-fill"></i>
+          Quick Actions
+        </div>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          {[
+            { label: "Add New Book", icon: "bi-plus-circle", path: "/admin/addbook" },
+            { label: "Bulk Import", icon: "bi-upload", path: "/admin/books/bulk-import" },
+            { label: "Issue Requests", icon: "bi-arrow-down-circle", path: "/admin/issuerequest" },
+            { label: "Return Requests", icon: "bi-arrow-up-circle", path: "/admin/returnrequest" },
+            { label: "View Books", icon: "bi-book", path: "/admin/viewbook" },
+            { label: "Issued Books", icon: "bi-journal-check", path: "/admin/issued" },
+            { label: "Fine Management", icon: "bi-currency-rupee", path: "/admin/fines" },
+            { label: "QR Codes", icon: "bi-qr-code", path: "/admin/qr-codes" },
+            { label: "Reports", icon: "bi-file-earmark-bar-graph", path: "/admin/reports" },
+            ...(localStorage.getItem("role") === "admin"
+              ? [
+                  { label: "Audit Log", icon: "bi-shield-check", path: "/admin/auditlog" },
+                  { label: "Send Alert", icon: "bi-megaphone", path: "/admin/send-notification" },
+                  { label: "Settings", icon: "bi-gear", path: "/admin/settings" },
+                ]
+              : []),
+          ].map((a, i) => (
+            <Link
+              key={i}
+              to={a.path}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "10px 18px",
+                background: "var(--gov-bg)",
+                border: "1px solid var(--gov-border)",
+                borderRadius: 6,
+                color: "var(--gov-text-primary)",
+                fontSize: 13,
+                fontWeight: 500,
+                textDecoration: "none",
+                transition: "all 0.15s",
+              }}
+            >
+              <i className={`bi ${a.icon}`} style={{ color: "var(--gov-primary)", fontSize: 16 }}></i>
+              {a.label}
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   );
-};
-
-export default AdminDashboard;
+}

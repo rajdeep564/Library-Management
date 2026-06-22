@@ -4,6 +4,8 @@ import "./books.css"
 import { useNavigate } from "react-router-dom";
 import { Server_URL } from "../../utils/config";
 import { showErrorToast, showSuccessToast } from "../../utils/toasthelper";
+import { asArray } from "../../utils/safeArray";
+import { SkeletonBookGrid, EmptyState, ErrorBanner } from "../../components/ui";
 
 
 const Books = () => {
@@ -13,6 +15,7 @@ const Books = () => {
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
 
   const navigate = useNavigate();
@@ -56,22 +59,33 @@ const Books = () => {
         navigate(`/bookdetails/${bookid}`);       
       }
 
-  useEffect(() => {
+  const fetchBooks = () => {
     setIsLoading(true);
+    setError(null);
     axios.get(`${Server_URL}books`)
       .then((response) => {
-        if (!response.data.error) {
-          setBooks(response.data.books);
-          setFilteredBooks(response.data.books);
-          const uniqueCategories = ["All", ...new Set(response.data.books.map(book => book.category))];
+        const list = asArray(response.data.books);
+        if (!response.data.error && list.length > 0) {
+          setBooks(list);
+          setFilteredBooks(list);
+          const uniqueCategories = ["All", ...new Set(list.map((book) => book.category))];
           setCategories(uniqueCategories);
+        } else if (!response.data.error) {
+          setBooks([]);
+          setFilteredBooks([]);
+          setCategories(["All"]);
         }
       })
-      .catch((error) => {
-        console.error("Error fetching books:", error);
-      }).finally(() => {
+      .catch((err) => {
+        setError(err.response?.data?.message || err.message || "Failed to load books");
+      })
+      .finally(() => {
         setIsLoading(false);
       });
+  };
+
+  useEffect(() => {
+    fetchBooks();
   }, []);
 
   const handleSearch = (e) => {
@@ -85,7 +99,7 @@ const Books = () => {
   };
 
   const filterBooks = (search, category) => {
-    let filtered = books;
+    let filtered = asArray(books);
     
     if (category !== "All") {
       filtered = filtered.filter(book => book.category === category);
@@ -135,19 +149,17 @@ const Books = () => {
             </div>
           </div>
 
+          <ErrorBanner message={error} onRetry={fetchBooks} />
+
           {isLoading ? (
-            <div className="loading-spinner">
-              <div className="spinner-border text-primary" role="status">
-                <span className="visually-hidden">Loading...</span>
-              </div>
-            </div>
-          ) : filteredBooks.length > 0 ? (
+            <SkeletonBookGrid count={8} />
+          ) : asArray(filteredBooks).length > 0 ? (
             <div className="books-grid">
-              {filteredBooks.map((book, index) => (
+              {asArray(filteredBooks).map((book, index) => (
                 <div key={index} className="book-card">
                   <div className="card-image-container">
                     <img
-                      src={book.coverImage}
+                      src={book.coverImage || "https://via.placeholder.com/150x200?text=No+Cover"}
                       className="card-image"
                       alt={book.title}
                       onError={(e) => {
@@ -181,11 +193,11 @@ const Books = () => {
               ))}
             </div>
           ) : (
-            <div className="no-books-found">
-              <i className="bi bi-book-slash"></i>
-              <h4>No books found!</h4>
-              <p>Try adjusting your search or category filter</p>
-            </div>
+            <EmptyState
+              iconClass="bi-book"
+              title="No books found"
+              message="Try adjusting your search or category filter"
+            />
           )}
         </div>
       </div>

@@ -1,11 +1,9 @@
-const { UserModel } = require("../model/UserModel");
-const bcrypt = require("bcryptjs");
-const JWT_SECRET = "12345@abcd12";
-const jwt = require("jsonwebtoken");
 const { BorrowModel } = require("../model/BorrowModel");
 const { BookModel } = require("../model/BookModel");
 const calculateFine = require("../utils/fineCalculator");
 const { clearCache } = require("../utils/cache");
+const { logAction } = require("../utils/auditLogger");
+const { getFineSettings } = require("../utils/systemConfig");
 const librarianController = {};
 
 librarianController.bookIssued = async (req, res) => {
@@ -74,6 +72,18 @@ librarianController.approveRequest = async (req, res) => {
     borrowRequest.approvedBy = req.userInfo.id;
     await borrowRequest.save();
     clearCache("homeData");
+
+    await logAction({
+      action: "BOOK_ISSUE_APPROVED",
+      performedBy: req.userInfo.id,
+      performedByName: req.userInfo.name,
+      performedByRole: req.userInfo.role,
+      targetId: borrowRequest._id,
+      targetType: "Borrow",
+      details: `Issue approved for member: ${borrowRequest.userId}`,
+      req
+    });
+
     res.json({ message: "Book issued successfully", borrow: borrowRequest });
   } catch (err) {
     console.error("Error approving request", err);
@@ -88,9 +98,14 @@ librarianController.returnRequest = async (req, res) => {
       .populate("bookId", "title")
       .sort({ createdAt: -1 });
 
+    const config = await getFineSettings();
     const requestsWithFine = requests.map((req) => {
-      const fine = calculateFine(req.dueDate, req.returnDate);
-      return { ...req.toObject(), fine };
+      const fineResult = calculateFine(req.dueDate, req.returnDate, config);
+      return {
+        ...req.toObject(),
+        fine: fineResult.cappedFine,
+        daysOverdue: fineResult.daysOverdue,
+      };
     });
 
     res.status(200).json({
@@ -125,12 +140,45 @@ librarianController.approveReturnRequest = async (req, res) => {
       await book.save();
     }
 
+    const returnDate = new Date();
+    const config = await getFineSettings();
+    const fineResult = calculateFine(borrow.dueDate, returnDate, config);
+    const fine = fineResult.cappedFine;
+
     borrow.status = "Returned";
-    borrow.returnDate = new Date();
+    borrow.returnDate = returnDate;
+    borrow.fineAmount = fine;
+    borrow.finePerDay = config.finePerDay;
+    borrow.finePaid = false;
     borrow.approvedBy = req.userInfo.id;
 
     await borrow.save();
     clearCache("homeData");
+
+    await logAction({
+      action: "BOOK_RETURN_APPROVED",
+      performedBy: req.userInfo.id,
+      performedByName: req.userInfo.name,
+      performedByRole: req.userInfo.role,
+      targetId: borrow._id,
+      targetType: "Borrow",
+      details: `Return approved. Fine: ₹${(fine / 100).toFixed(2)}`,
+      req
+    });
+
+    if (fine > 0) {
+      await logAction({
+        action: "FINE_CALCULATED",
+        performedBy: req.userInfo.id,
+        performedByName: req.userInfo.name,
+        performedByRole: req.userInfo.role,
+        targetId: borrow._id,
+        targetType: "Borrow",
+        details: `Fine ₹${(fine / 100).toFixed(2)} calculated for borrow ${borrow._id}`,
+        req
+      });
+    }
+
     res
       .status(200)
       .json({ message: "Book return approved and updated successfully" });

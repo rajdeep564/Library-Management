@@ -8,10 +8,36 @@ A complete Library Management System built with MongoDB, Express.js, React.js, a
 ## 🌐 Live Demo
 Check out the live demo of the project:https://library-management-app-karan.vercel.app/
 
-**Test Credentials:**
-- Admin: admin@example.com / admin123
-- Librarian: librarian@example.com / lib123
-- Student: student@example.com / student123
+**Test Credentials**
+
+Full demo dataset (~10k Goodreads books + 28 users, loans, fines, QR, notifications):
+
+```bash
+cd backend && npm run seed        # download CSV + seed
+cd backend && npm run seed:reset  # wipe + re-seed
+cd backend && npm run seed:clear  # remove seed data only
+```
+
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | admin@svpdl.gov.in | TestPass@123 |
+| Librarian | librarian1@svpdl.gov.in | TestPass@123 |
+| Member | amit.desai@gmail.com | TestPass@123 |
+| Member (expired) | lata.vyas@gmail.com | TestPass@123 |
+
+Legacy 60-book SVPDL dataset: `npm run seed:svpdl` / `seed:svpdl:reset`
+
+Minimal legacy setup (3 accounts only):
+
+```bash
+cd backend && npm run seed:users
+```
+
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | admin@example.com | admin123 |
+| Librarian | librarian@example.com | lib123 |
+| Student | student@example.com | student123 |
 
 ## ✨ Key Features
 
@@ -163,6 +189,22 @@ Start the frontend server by navigating to the frontend directory and running th
 ```bash
 npm run dev
 ```
+
+### 5. Seed Test Data (Development)
+
+From the `backend` directory:
+
+| Command | Description |
+|---------|-------------|
+| `npm run seed` | Download `books_enriched.csv` from GitHub and seed ~10k books + users/loans |
+| `npm run seed:reset` | Delete seed-tagged data and re-insert |
+| `npm run seed:clear` | Remove seed data only (`seededData: true`) |
+| `npm run seed:svpdl` | Legacy 60-book SVPDL dataset (idempotent) |
+| `npm run seed:svpdl:reset` | Wipe and re-seed SVPDL dataset |
+| `npm run seed:users` | Minimal 3-account setup (`admin@example.com`) |
+
+CSV seed books use accession prefix `LIB/` and `seededData: true`. SVPDL seed uses `SVPDL/2024/` and `isSeedData: true`. Production catalog entries are not affected.
+
 ---
 
 

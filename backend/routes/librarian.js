@@ -6,10 +6,10 @@ const {userAuth} = require("../middlewares/userAuth");
 const {checkRole} = require("../middlewares/checkRole");
 
 router.get("/bookissued",userAuth,checkRole(["admin", "librarian"]),librarianController.bookIssued)
-router.get("/issuerequest",userAuth,checkRole("librarian"),librarianController.issueRequest)
-router.get("/returnrequest",userAuth,checkRole("librarian"),librarianController.returnRequest)
-router.put("/approverequest/:id",userAuth,checkRole("librarian"),librarianController.approveRequest)
-router.put("/approvereturnrequest/:id",userAuth,checkRole("librarian"),librarianController.approveReturnRequest)
+router.get("/issuerequest",userAuth,checkRole("admin", "librarian"),librarianController.issueRequest)
+router.get("/returnrequest",userAuth,checkRole("admin", "librarian"),librarianController.returnRequest)
+router.put("/approverequest/:id",userAuth,checkRole("admin", "librarian"),librarianController.approveRequest)
+router.put("/approvereturnrequest/:id",userAuth,checkRole("admin", "librarian"),librarianController.approveReturnRequest)
 
 
 

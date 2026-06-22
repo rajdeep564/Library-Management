@@ -3,8 +3,9 @@ import { Server_URL } from "../../utils/config";
 import axios from "axios";
 import "./allcategories.css";
 import { Link } from "react-router-dom";
-import Loader from "../../components/Preloader";
+import { SkeletonCard, EmptyState, ErrorBanner } from "../../components/ui";
 import { showErrorToast, showSuccessToast } from "../../utils/toasthelper";
+import { asArray } from "../../utils/safeArray";
 
 export default function ViewAllCategories() {
   const [books, setBooks] = useState([]);
@@ -12,8 +13,11 @@ export default function ViewAllCategories() {
   const [activeCategory, setActiveCategory] = useState("All");
   const [categoryCounts, setCategoryCounts] = useState({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const fetchCategories = async () => {
+    setLoading(true);
+    setError(null);
     try {
       const url = Server_URL + "books";
       const response = await axios.get(url);
@@ -21,20 +25,23 @@ export default function ViewAllCategories() {
 
       if (error) {
         showErrorToast(message);
+        setBooks([]);
+        setFilteredBooks([]);
       } else {
-        setBooks(books);
-        setFilteredBooks(books);
+        const list = asArray(books);
+        setBooks(list);
+        setFilteredBooks(list);
 
         const categoryCountMap = {};
-        books.forEach((book) => {
+        list.forEach((book) => {
           const cat = book.category;
           categoryCountMap[cat] = (categoryCountMap[cat] || 0) + 1;
         });
 
         setCategoryCounts(categoryCountMap);
       }
-    } catch (error) {
-      console.error("Error fetching categories:", error);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Failed to load categories");
       showErrorToast("Failed to load categories.");
     } finally {
       setLoading(false);
@@ -44,9 +51,9 @@ export default function ViewAllCategories() {
   const handleCategoryClick = (selectedCategory) => {
     setActiveCategory(selectedCategory);
     if (selectedCategory === "All") {
-      setFilteredBooks(books);
+      setFilteredBooks(asArray(books));
     } else {
-      const filtered = books.filter(
+      const filtered = asArray(books).filter(
         (book) => book.category === selectedCategory
       );
       setFilteredBooks(filtered);
@@ -72,7 +79,7 @@ export default function ViewAllCategories() {
             >
               All
             </li>
-            {[...new Set(books.map((book) => book.category))].map(
+            {[...new Set(asArray(books).map((book) => book.category))].map(
               (category, index) => (
                 <li
                   key={index}
@@ -91,17 +98,18 @@ export default function ViewAllCategories() {
         {/* Main Content */}
         <main className="all-categories-main">
           <h2 className="all-categories-main-title">Explore All Categories</h2>
+          <ErrorBanner message={error} onRetry={fetchCategories} />
           {loading ? (
-            <Loader />
-          ) : filterBooks.length > 0 ? (
+            <SkeletonCard count={6} />
+          ) : asArray(filterBooks).length > 0 ? (
             <div className="all-categories-grid">
-              {[...new Set(filterBooks.map((book) => book.category))].map(
+              {[...new Set(asArray(filterBooks).map((book) => book.category))].map(
                 (category, index) => (
                   <div key={index} className="all-categories-card-wrapper">
                     <div className="all-categories-card shadow-sm">
                       <img
                         src={
-                          filterBooks.find(
+                          asArray(filterBooks).find(
                             (b) => b.category === category
                           )?.coverImage
                         }
@@ -130,9 +138,7 @@ export default function ViewAllCategories() {
               )}
             </div>
           ) : (
-            <div className="all-categories-empty">
-              <p>No books found in this category.</p>
-            </div>
+            <EmptyState iconClass="bi-grid" title="No categories" message="No books found in this category" />
           )}
         </main>
       </div>

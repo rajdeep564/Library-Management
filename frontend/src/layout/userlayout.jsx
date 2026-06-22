@@ -9,7 +9,9 @@ export default function userLayout() {
     <>
         
           <Navbar />
-          <Outlet />
+          <div className="animate-fadeIn">
+            <Outlet />
+          </div>
           <Footer />
            <ToastContainer
 position="top-right"

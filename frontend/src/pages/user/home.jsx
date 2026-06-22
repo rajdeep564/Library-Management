@@ -4,7 +4,8 @@ import axios from "axios";
 import "./home.css";
 import { Link } from "react-router-dom";
 import { FiBook, FiSearch, FiClock, FiUser, FiCalendar } from "react-icons/fi";
-import Preloader from "../../components/Preloader";
+import { PageLoader, ErrorBanner } from "../../components/ui";
+import { asArray } from "../../utils/safeArray";
 
 export default function Home() {
   const [categories, setCategories] = useState([]);
@@ -15,6 +16,7 @@ export default function Home() {
     students: 0
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // const fetchData = async () => {
   //   try {
@@ -59,14 +61,15 @@ export default function Home() {
  const fetchData = React.useCallback(async () => {
   try {
     setLoading(true);
+    setError(null);
     const { data } = await axios.get(Server_URL + "home");
     if (!data.error) {
-      setStats(data.stats);
-      setCategories(data.categories);
-      setNewArrivals(data.newArrivals);
+      setStats(data.stats || { totalBooks: 0, totalCategories: 0, totalActiveStudents: 0 });
+      setCategories(asArray(data.categories));
+      setNewArrivals(asArray(data.newArrivals));
     }
-  } catch (error) {
-    console.error("Error fetching data:", error);
+  } catch (err) {
+    setError(err.response?.data?.message || err.message || "Failed to load home data");
   } finally {
     setLoading(false);
   }
@@ -76,16 +79,17 @@ export default function Home() {
     fetchData();
   }, [fetchData]);
 
-   if (loading) return <Preloader />;  
+   if (loading) return <PageLoader label="Loading library..." />;
 
   return (
-    <div className="library-homepage">
+    <div className="library-homepage animate-fadeIn">
+      <ErrorBanner message={error} onRetry={fetchData} />
  
       <header className="hero-section">
         <div className="hero-overlay"></div>
         <div className="container hero-content">
-          <h1 className="hero-title">Welcome to College Central Library</h1>
-          <p className="hero-subtitle">Access academic resources, textbooks, and research materials</p>
+          <h1 className="hero-title">Welcome to e-GranthaAlaya</h1>
+          <p className="hero-subtitle">Digital Library Management — Ahmedabad Municipal Library Network</p>
           
           
           

@@ -1,11 +1,13 @@
-import React from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import axios from "axios";
 import { Server_URL } from "../../utils/config";
 import { showErrorToast, showSuccessToast } from "../../utils/toasthelper";
+import { ButtonSpinner } from "../../components/ui";
 
 
 const AddBookForm = () => {
+  const [saving, setSaving] = useState(false);
   const {
     register,
     handleSubmit,
@@ -14,6 +16,7 @@ const AddBookForm = () => {
   } = useForm();
 
   const onSubmit = async (data) => {
+    setSaving(true);
     try {
       const formData = new FormData();
       
@@ -52,36 +55,47 @@ const AddBookForm = () => {
     } catch (error) {
       console.error("Error:", error.response?.data?.message || error.message);
       showErrorToast("Failed to add book!");
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
-    <div className="container mt-4">
-      <h2 className="text-center mb-4">📚 Add a New Book</h2>
-      <form onSubmit={handleSubmit(onSubmit)} className="p-4 shadow-sm bg-light rounded">
+    <div>
+      <div style={{ marginBottom: 20 }}>
+        <h4 style={{ fontSize: 18, fontWeight: 700, color: "var(--gov-text-primary)", margin: 0 }}>
+          <i className="bi bi-plus-circle" style={{ marginRight: 8, color: "var(--gov-primary)" }}></i>
+          Add a New Book
+        </h4>
+        <p style={{ color: "var(--gov-text-light)", fontSize: 13, margin: "4px 0 0" }}>
+          Register a new title in the library catalog
+        </p>
+      </div>
+      <div className="gov-card">
+      <form onSubmit={handleSubmit(onSubmit)}>
         <div className="mb-3">
-          <label className="form-label">Book Title</label>
+          <label className="gov-label">Book Title</label>
           <input
             type="text"
-            className="form-control"
+            className="gov-input"
             {...register("title", { required: "Title is required" })}
           />
           {errors.title && <small className="text-danger">{errors.title.message}</small>}
         </div>
 
         <div className="mb-3">
-          <label className="form-label">Author</label>
+          <label className="gov-label">Author</label>
           <input
             type="text"
-            className="form-control"
+            className="gov-input"
             {...register("author", { required: "Author is required" })}
           />
           {errors.author && <small className="text-danger">{errors.author.message}</small>}
         </div>
 
         <div className="mb-3">
-          <label className="form-label">Category</label>
-          <select className="form-select" {...register("category", { required: "Category is required" })}>
+          <label className="gov-label">Category</label>
+          <select className="gov-input" {...register("category", { required: "Category is required" })}>
             <option value="">Select Category</option>
             <option value="Fiction">Fiction</option>
             <option value="Non-fiction">Non-fiction</option>
@@ -92,56 +106,55 @@ const AddBookForm = () => {
         </div>
 
         <div className="mb-3">
-          <label className="form-label">ISBN</label>
+          <label className="gov-label">ISBN</label>
           <input
             type="text"
-            className="form-control"
+            className="gov-input"
             {...register("isbn", { required: "ISBN is required" })}
           />
           {errors.isbn && <small className="text-danger">{errors.isbn.message}</small>}
         </div>
 
-        
-
         <div className="mb-3">
-          <label className="form-label">Book Cover Image</label>
+          <label className="gov-label">Book Cover Image</label>
           <input
             type="file"
-            className="form-control"
+            className="gov-input"
             {...register("coverImage")}
           />
         </div>
 
         <div className="mb-3">
-          <label className="form-label">Total Copies</label>
+          <label className="gov-label">Total Copies</label>
           <input 
             type="number" 
-            className="form-control" 
+            className="gov-input" 
             {...register("totalCopies", { required: true, min: 1 })} 
           />
         </div>
         
         <div className="mb-3">
-          <label className="form-label">Price</label>
+          <label className="gov-label">Price</label>
           <input 
             type="number" 
             step="0.01" 
-            className="form-control" 
+            className="gov-input" 
             {...register("price", { required: true })} 
           />
         </div>
         <div className="mb-3">
-          <label className="form-label">Description</label>
+          <label className="gov-label">Description</label>
           <textarea
-            className="form-control"
+            className="gov-input"
             rows="3"
             {...register("description", { required: "Description is required" })}
           ></textarea>
           {errors.description && <small className="text-danger">{errors.description.message}</small>}
         </div>
 
-        <button type="submit" className="btn btn-primary w-100">Add Book</button>
+        <ButtonSpinner type="submit" loading={saving} className="w-100">Add Book</ButtonSpinner>
       </form>
+      </div>
     </div>
   );
 };

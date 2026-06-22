@@ -1,5 +1,5 @@
-   .library-footer {
-    background-color: #2c3e50;
+   .library-footer.gov-footer {
+    background-color: var(--gov-primary-dark);
     color: #ecf0f1;
     padding: 60px 0 0;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -38,7 +38,7 @@
     bottom: 0;
     width: 50px;
     height: 2px;
-    background-color: #3498db;
+    background-color: var(--gov-accent);
   }
   
   .footer-about-text {
@@ -114,6 +114,14 @@
   .footer-copyright {
     color: #7f8c8d;
     font-size: 0.9rem;
+  }
+
+  .footer-developer {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.75);
+    margin-top: 6px;
+    width: 100%;
+    text-align: center;
   }
   
   .footer-legal {
