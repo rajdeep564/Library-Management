@@ -1,0 +1,17 @@
+# Netlify — frontend only (React + Vite)
+# Dashboard: app.netlify.com → Import rajdeep564/Library-Management
+# Base directory is set here; no need to change it in the UI.
+# Env: VITE_BACKEND_URL = https://YOUR-API.onrender.com/
+
+[build]
+  base = "frontend"
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

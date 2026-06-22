@@ -17,10 +17,27 @@ const { startNotificationCron } = require("./utils/notificationCron.js")
 const qrRoutes = require("./routes/qr.js")
 const notificationRoutes = require("./routes/notifications.js")
 
-const allowedOrigins = [
+const defaultOrigins = [
   "http://localhost:5173",
-  "https://library-management-app-karan.vercel.app",
+  "http://localhost:4173",
 ];
+
+function getAllowedOrigins() {
+  const fromEnv = [];
+  if (process.env.FRONTEND_URL) {
+    fromEnv.push(process.env.FRONTEND_URL.replace(/\/$/, ""));
+  }
+  if (process.env.CORS_ORIGINS) {
+    fromEnv.push(
+      ...process.env.CORS_ORIGINS.split(",")
+        .map((o) => o.trim().replace(/\/$/, ""))
+        .filter(Boolean)
+    );
+  }
+  return [...new Set([...defaultOrigins, ...fromEnv])];
+}
+
+const allowedOrigins = getAllowedOrigins();
 
 app.use(express.json()); // Parse JSON
 app.use(cors({
@@ -28,7 +45,7 @@ app.use(cors({
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(new Error(`Not allowed by CORS: ${origin}`));
     }
   },
   credentials: true,

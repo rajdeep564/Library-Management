@@ -1,12 +1,13 @@
-# Netlify — frontend only (React + Vite)
-# Dashboard: Site settings → Build & deploy → Base directory: frontend
-# Env var: VITE_BACKEND_URL = https://your-api.onrender.com/
+# Netlify config lives at repo root: ../netlify.toml
+# If you set Base directory = frontend in Netlify UI, use this file instead:
 
 [build]
   command = "npm run build"
   publish = "dist"
 
-# React Router (SPA) — all routes serve index.html
+[build.environment]
+  NODE_VERSION = "20"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

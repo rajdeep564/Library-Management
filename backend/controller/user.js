@@ -1,11 +1,11 @@
 const  {UserModel} = require("../model/UserModel");
 const  {ContactModel} = require("../model/ContactModel");
-const nodemailer = require("nodemailer");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const {OtpModel} = require("../model/OtpModel");
 const { logAction } = require("../utils/auditLogger");
 const { sendWelcomeMember } = require("../utils/notificationService");
+const { sendEmail, isEmailConfigured } = require("../utils/emailSender");
 const userController = {};
 
 userController.userRegistration = async (req, res) => {
@@ -138,18 +138,13 @@ userController.addContact = async(req,res) => {
 
 }
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
-
-
 userController.forgotPassword = async (req, res) => {
   const { email } = req.body;
   try {
+    if (!isEmailConfigured()) {
+      return res.status(503).json({ message: "Email service is not configured on the server" });
+    }
+
     const user = await UserModel.findOne({ email });
     if (!user) return res.status(400).json({ message: "User not found" });
 
@@ -161,12 +156,15 @@ userController.forgotPassword = async (req, res) => {
       { upsert: true, new: true }
     );
 
-    await transporter.sendMail({
-      from: process.env.EMAIL,
-      to: email,
-      subject: "Your OTP for Password Reset",
-      html: `<p>Your OTP is <strong>${otp}</strong>. It is valid for 10 minutes.</p>`,
-    });
+    const sent = await sendEmail(
+      email,
+      "Your OTP for Password Reset",
+      `<p>Your OTP is <strong>${otp}</strong>. It is valid for 10 minutes.</p>`
+    );
+
+    if (!sent) {
+      return res.status(500).json({ message: "Failed to send OTP email" });
+    }
 
     res.json({ message: "OTP sent to your email" });
   } catch (error) {

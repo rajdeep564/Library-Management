@@ -1,9 +1,9 @@
-const nodemailer = require("nodemailer");
 const { NotificationModel } = require("../model/NotificationModel");
 const { BorrowModel } = require("../model/BorrowModel");
 const { UserModel } = require("../model/UserModel");
 const calculateFine = require("./fineCalculator");
 const { getFineSettings } = require("./systemConfig");
+const { sendEmail } = require("./emailSender");
 const {
   overdueTemplate,
   dueTomorrowTemplate,
@@ -19,49 +19,12 @@ const DEFAULT_PREFS = {
   inAppAll: true,
 };
 
-function getTransporter() {
-  const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER || process.env.EMAIL_USER;
-  const pass = process.env.SMTP_PASS || process.env.EMAIL_PASS;
-
-  if (host) {
-    return nodemailer.createTransport({
-      host,
-      port: Number(process.env.SMTP_PORT || 587),
-      secure: false,
-      auth: { user, pass },
-    });
-  }
-
-  if (user && pass) {
-    return nodemailer.createTransport({
-      service: "gmail",
-      auth: { user, pass },
-    });
-  }
-
-  return null;
-}
-
 function formatRupees(paisa = 0) {
   return (Number(paisa || 0) / 100).toFixed(2);
 }
 
 function getUserPrefs(user) {
   return { ...DEFAULT_PREFS, ...(user?.notificationPreferences || {}) };
-}
-
-async function sendEmail(to, subject, htmlBody) {
-  const transporter = getTransporter();
-  if (!transporter || !to) return false;
-
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM || process.env.EMAIL || process.env.EMAIL_USER,
-    to,
-    subject,
-    html: htmlBody,
-  });
-  return true;
 }
 
 async function createNotification(userId, type, title, message, meta = {}, options = {}) {

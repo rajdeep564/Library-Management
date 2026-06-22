@@ -1,0 +1,2 @@
+# Netlify SPA fallback (backup if netlify.toml is not used)
+/*    /index.html   200
