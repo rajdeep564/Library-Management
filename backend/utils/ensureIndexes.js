@@ -1,7 +1,7 @@
 const { BookModel } = require("../model/BookModel");
 const { BorrowModel } = require("../model/BorrowModel");
 const { UserModel } = require("../model/UserModel");
-const { AuditLogModel } = require("../model/AuditLogModel");
+const AuditLogModel = require("../model/AuditLogModel");
 
 async function ensureIndexes() {
   await Promise.all([
