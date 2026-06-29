@@ -116,12 +116,54 @@
     font-size: 0.9rem;
   }
 
-  .footer-developer {
-    font-size: 0.85rem;
-    color: rgba(255, 255, 255, 0.75);
-    margin-top: 6px;
+  .footer-powered-by {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
     width: 100%;
-    text-align: center;
+    margin-top: 12px;
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.75);
+    transition: opacity 0.2s ease;
+  }
+
+  .footer-powered-by:hover {
+    opacity: 0.9;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .footer-powered-by-text {
+    font-size: 0.85rem;
+  }
+
+  .footer-powered-by-logo {
+    height: 32px;
+    width: auto;
+    object-fit: contain;
+  }
+
+  .footer-powered-by--admin {
+    margin-top: 0;
+    color: var(--gov-text-secondary);
+  }
+
+  .footer-powered-by--admin .footer-powered-by-text {
+    font-size: 0.8rem;
+  }
+
+  .footer-powered-by--admin .footer-powered-by-logo {
+    height: 22px;
+  }
+
+  .admin-powered-by-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    padding: 8px 24px;
+    background: white;
+    border-top: 1px solid var(--gov-border);
   }
   
   .footer-legal {

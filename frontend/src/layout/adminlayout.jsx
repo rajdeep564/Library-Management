@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Outlet, useNavigate, useLocation, Link } from "react-router-dom";
 import NotificationBell from "../components/NotificationBell";
+import PoweredByWildChild from "../components/PoweredByWildChild";
+import "../components/footer.css";
 const navItems = [
   { label: "Dashboard", path: "/admin", icon: "bi-speedometer2", roles: ["admin", "librarian"] },
   { label: "Books", path: "/admin/viewbook", icon: "bi-book", roles: ["admin", "librarian"] },
@@ -248,6 +250,10 @@ export default function AdminLayout() {
         <main style={{ padding: 24, flex: 1 }} className="animate-fadeIn">
           <Outlet />
         </main>
+
+        <div className="admin-powered-by-bar">
+          <PoweredByWildChild variant="admin" />
+        </div>
       </div>
 
     </div>

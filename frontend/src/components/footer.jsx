@@ -11,6 +11,7 @@ import {
   FiClock,
 } from "react-icons/fi";
 import "./footer.css";
+import PoweredByWildChild from "./PoweredByWildChild";
 
 const Footer = () => {
   const handleLinkClick = () => {
@@ -87,9 +88,7 @@ const Footer = () => {
           <div className="footer-copyright">
             &copy; {new Date().getFullYear()} e-GranthaAlaya — Digital Library Management System. All rights reserved.
           </div>
-          <div className="footer-developer">
-            Developed for Ahmedabad Municipal Library Network
-          </div>
+          <PoweredByWildChild variant="footer" />
           <div className="footer-legal">
             <Link to="/privacy" className="legal-link" onClick={handleLinkClick}>Privacy Policy</Link>
             <Link to="/terms" className="legal-link" onClick={handleLinkClick}>Terms of Use</Link>
