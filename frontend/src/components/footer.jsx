@@ -85,10 +85,12 @@ const Footer = () => {
         </div>
 
         <div className="footer-bottom">
-          <div className="footer-copyright">
-            &copy; {new Date().getFullYear()} e-GranthaAlaya — Digital Library Management System. All rights reserved.
+          <div className="footer-bottom-row">
+            <div className="footer-copyright">
+              &copy; {new Date().getFullYear()} e-GranthaAlaya — Digital Library Management System. All rights reserved.
+            </div>
+            <PoweredByWildChild variant="footer" />
           </div>
-          <PoweredByWildChild variant="footer" />
           <div className="footer-legal">
             <Link to="/privacy" className="legal-link" onClick={handleLinkClick}>Privacy Policy</Link>
             <Link to="/terms" className="legal-link" onClick={handleLinkClick}>Terms of Use</Link>
